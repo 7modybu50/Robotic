@@ -3,109 +3,133 @@ import socket
 import time
 import threading
 
-HOST_IP = "127.0.0.1"
+TOTAL_CARDS = 5
+
+READY = "ready".encode('utf-8')
+
+ROUND_WIN = 'w'.encode('utf-8')
+ROUND_LOSE = 'l'.encode('utf-8')
+ROUND_DRAW = 'd'.encode('utf-8')
+
+WIN = 'W'.encode('utf-8')
+LOSE = 'L'.encode('utf-8')
+
+HOST = "127.0.0.1"
 PORT = 65432
 
-lock = threading.Lock()
 connectedUsers = 0
+threads = []
 choices = []
-won = False
 
-def startThreads(job):
-    try:
-        t1 = threading.Thread(target = job)
-        t2 = threading.Thread(target = job)
+checkpoint = threading.Barrier(2)
+lock = threading.Lock()
 
-        t1.start()
-        t2.start()
+def addPoint(player, position):
+    player.points[position] += 1
 
-        return t1, t2
-    
-    except:
-        raise Exception("Threads failed")
+def main(con, addr):
 
-def connection():
-    global connectedUsers
-    skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    skt.bind((HOST_IP, PORT))
-    
-    skt.listen()
-    connection, address = skt.accept()
+    while not ready:
+        time.sleep(2)
 
-    lock.acquire()
-    connectedUsers += 1
-    lock.release()
+    con.sendall(READY)
 
-    while connectedUsers != 2:
-        print("Waiting for players: "+ str(connectedUsers) + "/2")
-        time.sleep(5)
-
-    skt.sendall("ready")
-
-    return skt, connection, address
-
-
-def main():
-    skt, conn, addr = connection()
-
-    #---> Game Setup <---#
+      #---> Game Setup <---#
     player = logic.player()     # Initialise a player object for the player
     player.draw(5)              # Draw a starting hand of cards
 
-    skt.sendall(player.cards)   # Send cards to player CALL_POINT_1
+    msg = '|'.join(player.cards)
+    msg = msg.encode('utf-8')
+    con.sendall(msg)
 
     #---> Game Start <---#
+    global won
+    while not won:                       # Checks if either player has won
+        choice = con.recv(1).decode('utf-8')    # Collect Choice
 
-    while not won:              # Checks if either player has won
-        
-        choice = skt.recv(8)    # Collect Choice
+        pointslot = -1
+
+        print(choice)
         lock.acquire()
-        choices.append(choice)  # Set Choices array ready for win descision
+        choices.append(choice)          # Set Choices array ready for win descision
         lock.release()
 
+        checkpoint.wait()
+        
         sorted_choices = sorted(choices)
-
-
         if sorted_choices[0] == sorted_choices[1]: # Checks draws
             winner = "draw"
             
-        elif sorted_choices[0] == "paper":         # Checks wins
-            if sorted_choices[1] == "rock":
-                winner = "paper"
-                winslot = 1
+        elif sorted_choices[0] == 'p':         # Checks wins
+            if sorted_choices[1] == 'r':
+                winner = 'p'
+                pointslot = 1
+                
             else:
-                winner = "scissors"
-                winslot = 2
+                winner = 's'
+                pointslot = 2
         else:
-            winner = "rock"
-            winslot = 0
+            winner = 'r'
+            pointslot = 0
 
 
         if winner == "draw":          # Sends draw signal
-            skt.sendall(2)
+            con.sendall(ROUND_DRAW)
         elif choice == winner:      # Updates winner
-            player.points[winslot]
-            skt.sendall(1)
+            con.sendall(ROUND_WIN)
+            player.points[pointslot] += 1
         else:                       # Updates loser
-            skt.sendall(0)
+            con.sendall(ROUND_LOSE)
         
 
         if player.hasWon():         # Checks if player has won
             lock.acquire()
             won = True
             lock.release()
-            
+
+
+        checkpoint.wait()
+        
+        lock.acquire()
+        choices.pop()
+        lock.release()
+
+        print(player.points)
+
+        checkpoint.wait()
 
     if player.won:              # Tell the Client if they've won or not
-        skt.sendall(1)
+        con.sendall(WIN)
     else:
-        skt.sendall(0)
-    
-    #---> Clean-up <---#
-    skt.close()
-    
+        con.sendall(LOSE)
 
-t1, t2 = startThreads(main)
-t1.join()
-t2.join()
 
+# -- Main -- #
+ready = False
+won = False
+
+skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+skt.bind((HOST, PORT))
+skt.listen(2)
+
+while connectedUsers < 2:
+    #try:
+        con, addr = skt.accept()
+        thread = threading.Thread(target=main, args=(con, addr))
+        thread.start()
+        threads.append(thread)
+    
+        connectedUsers += 1
+        print("player connected successfully")
+
+   # except:
+        #print("Connection Failed...")
+
+
+ready = True
+
+for thread in threads:
+    thread.join()
+
+skt.close()

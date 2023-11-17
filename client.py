@@ -1,15 +1,71 @@
-import interface
 import socket
 import time
+import threading
 import tkinter as tk
+from tkinter import *
 
-HOST_IP = "127.0.0.1"
+HOST = "127.0.0.1"
 PORT = 65432
+
+TOTAL_CARDS = 5
+WIN_SIZE_X = 900
+WIN_SIZE_Y = 700
 
 window = tk.Tk()
 
+cardslots = []
+
+def screenGen(window, skt):
+    #Window generation
+    window.geometry(str(WIN_SIZE_X) + "x" + str(WIN_SIZE_Y))
+    window.resizable(False, False)
+
+    #Split screen into sections (Frames)
+    topBar = Frame(window, height= 30)
+    scorespace = Frame(window, height= 200)
+    instructionBar = Frame(window, height= 30)
+    handspace = Frame(window)
+    
+    #Pack to screen
+    topBar.pack(side = TOP, fill='x', expand=False)
+    scorespace.pack(side = TOP, fill='both', expand=True)
+    instructionBar.pack(side = TOP, fill='x', expand=False)
+    handspace.pack(side = BOTTOM, fill='both', expand=True)
+
+    #Fill Cardslot with cards (buttons)
+    for i in range(TOTAL_CARDS):
+        cardslots.append(tk.Button(handspace, text="", command=lambda local = i: sendChoice(local, skt)))
+        cardslots[i].pack(side=LEFT, fill="both", expand=True)
+
+    return cardslots
+
+def sendChoice(buttonNumber, skt):
+    msg = cards[buttonNumber].encode('utf-8')
+    print(cards)
+    print(buttonNumber)
+    print(cards[buttonNumber])
+    skt.sendall(msg)
+
+    
+    
+    toggleButtons()
+
+def toggleButtons():
+    for card in cardslots:
+        if card['state'] == "normal":
+            card.configure(state="disabled")
+        else:
+            card.configure(state="normal")
+
+def endScreen(outcome):
+    for widget in window.winfo_children():
+        widget.destroy()
+
+    endScreenText = Label(window, text=outcome)
+    endScreenText.pack(fill="both", expand=True)
+
 def connectToServer(skt):
-    for i in range(6): #Equivalent to trying for 1min
+    for i in range(6):                                      # Equivalent to trying for 1min
         try:
             skt.connect((HOST, PORT))
             return 1
@@ -19,36 +75,74 @@ def connectToServer(skt):
     print("Connection Failed")
     return 0
 
-# STEP 1 - Connect to Server
+def gameProcessor():
+    global won
+    won = False
+    while not won:
+        msg = skt.recv(1).decode('utf-8')
+        
+        if msg == 'w':
+            print("Battle Won")
+            toggleButtons()
+        elif msg == 'l':
+            print("Battle Lost")
+            toggleButtons()
+        elif msg == 'd':
+            print("Draw")
+            toggleButtons()
+
+        elif msg == 'W':
+            endScreen("GAME WON")
+            time.sleep(10)
+            window.destroy()
+            
+        elif msg == 'L':
+            endScreen("GAME LOST :(")
+            time.sleep(10)
+            window.destroy()
+
+
+# -- Connect To Server -- #
 
 skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 if connectToServer(skt):
+
+    print("Waiting for Player 2...")                        # Waits to recieve ready (or any 5 bytes lol)
+    skt.recv(5) 
+    print("Player 2 connected")
     
-    while skt.recv(5) != "ready":           # Wait for player 2 to connect
-        time.wait(5)
+# -- Setup GUI & Game objects -- #
 
-# STEP 2 - Setup Game
+    cardslots = screenGen(window, skt)                                  # Load GUI
+    
+    cards = skt.recv(10).decode('utf-8').split('|')       # Probably could see abt reducing from 1024 ??? CALL_POINT_1
 
-    cardslots = interface.screenGen(window, skt)     # Load GUI
+    for i in range(len(cards)):                           # Sets the cards in the GUI slots
+        if cards[i] == 'r':
+            cardslots[i].config(text="Rock")
+        elif cards[i] == 'p':
+            cardslots[i].config(text="Paper")
+        elif cards[i] == 's':
+            cardslots[i].config(text="Scissors")
+        else:
+            cardslots[i].config(text="None")
 
-    cards = skt.recv(1024)                  # Probably could see abt reducing from 1024 ??? CALL_POINT_1
+# -- Play Game -- #
 
-    for i in range(len(cards)-1):           # Sets the cards in the GUI slots
-        cardslots[i].config(text=cards[i])
+    thread = threading.Thread(target=gameProcessor)
+    thread.start()
 
-# STEP 3 - Play Game
-    # INTERFACE sends button click to SERVER
-    # INTERFACE locks buttons
-    # SERVER tells outcome to CLIENT
-    # INTERFACE updates score
-    # If recieves won then INTERFACE displays win screen and CLIENT to Step 4
-    # else INTERFACE unlocks buttons
+    tk.mainloop()
+    # tkinter updates scorebar!!!! - TODO
     
 
-# Step 4 - Close Connection
-    window.destroy()
+# -- Clean Up Everything -- #
+    thread.join()
+
     skt.close()
+
+
 
 
 
