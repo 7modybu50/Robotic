@@ -4,9 +4,9 @@ TOTAL_CARDS = 5
 WIN_SIZE_X = 900
 WIN_SIZE_Y = 600
 
-rocks = 10
-papers = 10
-scissors = 10
+rocks = 100
+papers = 100
+scissors = 100
 
 class player:
 

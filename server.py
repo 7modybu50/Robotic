@@ -5,14 +5,14 @@ import threading
 
 TOTAL_CARDS = 5
 
-READY = "ready".encode()
+READY = "ready".encode('utf-8')
 
-ROUND_WIN = 'w'.encode()
-ROUND_LOSE = 'l'.encode()
-ROUND_DRAW = 'd'.encode()
+ROUND_WIN = 'w'.encode('utf-8')
+ROUND_LOSE = 'l'.encode('utf-8')
+ROUND_DRAW = 'd'.encode('utf-8')
 
-WIN = 'W'.encode()
-LOSE = 'L'.encode()
+WIN = 'W'.encode('utf-8')
+LOSE = 'L'.encode('utf-8')
 
 HOST = "127.0.0.1"
 PORT = 65432
@@ -23,6 +23,9 @@ choices = []
 
 checkpoint = threading.Barrier(2)
 lock = threading.Lock()
+
+def addPoint(player, position):
+    player.points[position] += 1
 
 def main(con, addr):
 
@@ -42,39 +45,41 @@ def main(con, addr):
     #---> Game Start <---#
     global won
     while not won:                       # Checks if either player has won
-        
-        choice = con.recv(1).decode()    # Collect Choice
-            
+        choice = con.recv(1).decode('utf-8')    # Collect Choice
+
+        pointslot = -1
+
         print(choice)
         lock.acquire()
         choices.append(choice)          # Set Choices array ready for win descision
         lock.release()
 
+        checkpoint.wait()
+        
         sorted_choices = sorted(choices)
-
-
         if sorted_choices[0] == sorted_choices[1]: # Checks draws
             winner = "draw"
             
-        elif sorted_choices[0] == "paper":         # Checks wins
-            if sorted_choices[1] == "rock":
-                winner = "paper"
-                player.points[1] += 1
+        elif sorted_choices[0] == 'p':         # Checks wins
+            if sorted_choices[1] == 'r':
+                winner = 'p'
+                pointslot = 1
+                
             else:
-                winner = "scissors"
-                player.points[2] += 1
+                winner = 's'
+                pointslot = 2
         else:
-            winner = "rock"
-            player.points[0] += 1
+            winner = 'r'
+            pointslot = 0
 
 
         if winner == "draw":          # Sends draw signal
-            skt.sendall(ROUND_DRAW)
+            con.sendall(ROUND_DRAW)
         elif choice == winner:      # Updates winner
-            player.points[winslot]
-            skt.sendall(ROUND_WIN)
+            con.sendall(ROUND_WIN)
+            player.points[pointslot] += 1
         else:                       # Updates loser
-            skt.sendall(ROUND_LOSE)
+            con.sendall(ROUND_LOSE)
         
 
         if player.hasWon():         # Checks if player has won
@@ -82,13 +87,21 @@ def main(con, addr):
             won = True
             lock.release()
 
+
         checkpoint.wait()
-            
+        
+        lock.acquire()
+        choices.pop()
+        lock.release()
+
+        print(player.points)
+
+        checkpoint.wait()
 
     if player.won:              # Tell the Client if they've won or not
-        skt.sendall(WIN)
+        con.sendall(WIN)
     else:
-        skt.sendall(LOSE)
+        con.sendall(LOSE)
 
 
 # -- Main -- #

@@ -1,5 +1,6 @@
 import socket
 import time
+import threading
 import tkinter as tk
 from tkinter import *
 
@@ -33,28 +34,32 @@ def screenGen(window, skt):
 
     #Fill Cardslot with cards (buttons)
     for i in range(TOTAL_CARDS):
-        cardslots.append(tk.Button(handspace, text="", command=lambda: sendChoice(i, skt)))
+        cardslots.append(tk.Button(handspace, text="", command=lambda local = i: sendChoice(local, skt)))
         cardslots[i].pack(side=LEFT, fill="both", expand=True)
 
     return cardslots
 
 def sendChoice(buttonNumber, skt):
-    msg = cards[buttonNumber][0].encode()
+    msg = cards[buttonNumber].encode('utf-8')
+    print(cards)
+    print(buttonNumber)
+    print(cards[buttonNumber])
     skt.sendall(msg)
+
+    
+    
     toggleButtons()
 
 def toggleButtons():
-    for card in cardslot:
+    for card in cardslots:
         if card['state'] == "normal":
             card.configure(state="disabled")
         else:
             card.configure(state="normal")
 
 def endScreen(outcome):
-    topBar.destroy()
-    scorespace.destroy()
-    instructionBar.destroy()
-    handspace.destroy()
+    for widget in window.winfo_children():
+        widget.destroy()
 
     endScreenText = Label(window, text=outcome)
     endScreenText.pack(fill="both", expand=True)
@@ -70,6 +75,33 @@ def connectToServer(skt):
     print("Connection Failed")
     return 0
 
+def gameProcessor():
+    global won
+    won = False
+    while not won:
+        msg = skt.recv(1).decode('utf-8')
+        
+        if msg == 'w':
+            print("Battle Won")
+            toggleButtons()
+        elif msg == 'l':
+            print("Battle Lost")
+            toggleButtons()
+        elif msg == 'd':
+            print("Draw")
+            toggleButtons()
+
+        elif msg == 'W':
+            endScreen("GAME WON")
+            time.sleep(10)
+            window.destroy()
+            
+        elif msg == 'L':
+            endScreen("GAME LOST :(")
+            time.sleep(10)
+            window.destroy()
+
+
 # -- Connect To Server -- #
 
 skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -84,7 +116,7 @@ if connectToServer(skt):
 
     cardslots = screenGen(window, skt)                                  # Load GUI
     
-    cards = skt.recv(1024).decode('utf-8').split('|')       # Probably could see abt reducing from 1024 ??? CALL_POINT_1
+    cards = skt.recv(10).decode('utf-8').split('|')       # Probably could see abt reducing from 1024 ??? CALL_POINT_1
 
     for i in range(len(cards)):                           # Sets the cards in the GUI slots
         if cards[i] == 'r':
@@ -98,37 +130,17 @@ if connectToServer(skt):
 
 # -- Play Game -- #
 
-    won = False
-    while not won:
-        msg = skt.recv(1).decode()
-        
-        if msg == 'w':
-            print("Battle Won")
-            toggleButtons()
-        elif msg == 'l':
-            print("Battle Lost")
-            toggleButtons()
-        elif msg == 'd':
-            print("Draw")
-            toggleButtons()
+    thread = threading.Thread(target=gameProcessor)
+    thread.start()
 
-        elif msg == 'W':
-            endScreen("GAME WON")
-            won = True
-        elif msg == 'L':
-            endScreen("GAME LOST :(")
-            won = True
-
-        else:
-            print("The server has sent something wierd")
-    
+    tk.mainloop()
     # tkinter updates scorebar!!!! - TODO
     
 
 # -- Clean Up Everything -- #
-    window.mainloop()
+    thread.join()
 
-skt.close()
+    skt.close()
 
 
 
