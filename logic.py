@@ -1,4 +1,3 @@
-import tkinter as tk
 from random import randint
 
 TOTAL_CARDS = 5
@@ -23,7 +22,7 @@ class player:
 
     def playCard(self, index):
         self.cards.pop(index)
-        return cards
+        return self.cards
 
     def hasWon(self):
         if 3 in self.points:

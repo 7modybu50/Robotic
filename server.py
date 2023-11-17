@@ -13,8 +13,8 @@ won = False
 
 def startThreads(job):
     try:
-        t1 = threading.Thread(job)
-        t2 = threading.Thread(job)
+        t1 = threading.Thread(target = job)
+        t2 = threading.Thread(target = job)
 
         t1.start()
         t2.start()
@@ -22,10 +22,10 @@ def startThreads(job):
         return t1, t2
     
     except:
-        print("Threading Failed")
-        return -1, -1
+        raise Exception("Threads failed")
 
 def connection():
+    global connectedUsers
     skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     skt.bind((HOST_IP, PORT))
     
@@ -56,7 +56,7 @@ def main():
 
     #---> Game Start <---#
 
-    while !won:                 # Checks if either player has won
+    while not won:              # Checks if either player has won
         
         choice = skt.recv(8)    # Collect Choice
         lock.acquire()
@@ -81,7 +81,7 @@ def main():
             winslot = 0
 
 
-        if winner == draw:          # Sends draw signal
+        if winner == "draw":          # Sends draw signal
             skt.sendall(2)
         elif choice == winner:      # Updates winner
             player.points[winslot]
