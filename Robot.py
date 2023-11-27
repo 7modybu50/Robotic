@@ -138,3 +138,56 @@ class TransitionModel(pomdp_py.TransitionModel):
         # prime_prob = 1? * see below? / (num_x_unobserved / remaining_cards)
         # return prime_prob
 
+class RewardModel(pomdp_py.RewardModel):
+    def _reward_func(self, state, action):
+        # ignore variable names for now
+        opponent_about_to_win = any(win == 2 for win in state.oPoints) or all(win >= 1 for win in state.oPoints)
+        robot_about_to_win = any(win == 2 for win in state.myPoints) or all(win >= 1 for win in state.myPoints)
+
+        if opponent_about_to_win: 
+            # action[5:] gets the card played by the robot
+            if action[5:] == "rock" and state.name == "scissor":
+                return 100  # robot wins this round
+            elif action[5:] == "paper" and state.name == "rock":
+                return 100  # robot wins this round
+            elif action[5:] == "scissor" and state.name == "paper":
+                return 100  # robot wins this round
+            elif action[5:] == state.name:  
+                return -100  # draw
+            else:
+                return -500  # robot loses this round
+        elif robot_about_to_win:
+            if action[5:] == "rock" and state.name == "scissor":
+                return 200  # robot wins the game
+            elif action[5:] == "paper" and state.name == "rock":
+                return 200  # robot wins the game
+            elif action[5:] == "scissor" and state.name == "paper":
+                return 200  # robot wins the game
+            else:
+                return 0  # draw or loses this round
+        else:
+            if action == "play_rock":
+                if state.name == "scissor":
+                    return 10  # robot wins this round
+                elif state.name == "rock":
+                    return 0  # draw
+                else:
+                    return -100  # robot loses this round
+            elif action == "play_paper":
+                if state.name == "rock":
+                    return 10  # robot wins this round
+                elif state.name == "paper":
+                    return 0  # draw
+                else:
+                    return -100  # robot loses this round
+            elif action == "play_scissor":
+                if state.name == "paper":
+                    return 10  # robot wins this round
+                elif state.name == "scissor":
+                    return 0  # draw
+                else:
+                    return -100  # robot loses this round
+    
+    def sample(self, state, action, next_state):
+        return self._reward_func(state, action)
+    
