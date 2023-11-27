@@ -95,3 +95,33 @@ class ObservationModel(pomdp_py.ObservationModel):
         return [RRSPObservation(s) for s in ["rock", "paper", "scissor"]]
     def update_state(self, state):
         self.current_state = state
+
+
+
+standard = ['r','p','s'] #Put somewhere
+class TransitionModel(pomdp_py.TransitionModel):
+    def probability(self, start_state, end_state, action):
+
+        base = 1/3 #at start prime_prob MUST be roughly == this
+
+        #Can the opponent make it end_state?
+
+        #First find the opponents move required to get to the end_state
+        if (sum(end_state.points) > sum(end_state.points)): # player wins in end_state, opponent loses
+            opp_action = (standard.index(action[5]) + 2) % 3
+        elif (sum(end_state.opp_points) > sum(end_state.start_points)): #opponent wins in end_state, player loses
+            opp_action = (standard.index(action[5]) + 1) % 3
+        else:
+            opp_action = standard.index(action[5])
+
+        #Second, calculate the probability opponent has that card.
+
+        #P(plays x | card_in_hand) = P(card_in_hand | plays x) * P(plays x) / P(card_in_hand)
+
+        # prime_prob = 1? * see below? / (num_x_unobserved / remaining_cards)
+        # ret prime_prob
+
+        #1.5ly, calculate the probability that the opponent wants to play that card P(plays x)
+
+        # opp close to win? Higher prob -> points of type x / 3 OR number of collumns != 0 / 3
+        # player far from win? Higher prob -> is necessary ????
