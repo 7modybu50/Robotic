@@ -114,14 +114,27 @@ class TransitionModel(pomdp_py.TransitionModel):
         else:
             opp_action = standard.index(action[5])
 
-        #Second, calculate the probability opponent has that card.
+        #Secondly, calculate the probability that the opponent wants to play that card P(plays x):
+        # (1) Higher Probability of playing cards that have a chance of getting them a win (Offense)
+        # (2) Higher Probability of playing cards that block opponent wins (Offense)
+        # (3) To play the card, they need it in hand
 
+        #(1)
+        #See how close the opponent is to achieving the win condition of "winning with 1 of each type"
+        if (start_state.opp_points[(opp_action+1)%3] >= 1) or (start_state.opp_points[(opp_action+2)%3] >= 1):
+            spread_win_closeness = 1/3
+            if (start_state.opp_points[(opp_action+1)%3] >= 1) or (start_state.opp_points[(opp_action+2)%3] >= 1):
+                spread_win_closeness = 2/3
+
+        #Extract the win condition the opponent is closer to in the form of a fraction of "closeness"
+        opp_win_closeness = max((start_state.opp_points[opp_action] / 3), spread_win_closeness)
+
+        #Calculate the probability of the opponent playing that card.
+        #play_x_prob = opp_win_closeness (some operator) player_win_closeness
+
+        #Thirdly, calculate the probability opponent plays that card given they've picked it up.
         #P(plays x | card_in_hand) = P(card_in_hand | plays x) * P(plays x) / P(card_in_hand)
 
         # prime_prob = 1? * see below? / (num_x_unobserved / remaining_cards)
-        # ret prime_prob
+        # return prime_prob
 
-        #1.5ly, calculate the probability that the opponent wants to play that card P(plays x)
-
-        # opp close to win? Higher prob -> points of type x / 3 OR number of collumns != 0 / 3
-        # player far from win? Higher prob -> is necessary ????
