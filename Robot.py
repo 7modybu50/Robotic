@@ -168,7 +168,7 @@ class RewardModel(pomdp_py.RewardModel):
         else:
             if action == "play_rock":
                 if state.name == "scissor":
-                    return 10  # robot wins this round
+                    return 10  # robot wins this roundpi
                 elif state.name == "rock":
                     return 0  # draw
                 else:
@@ -191,3 +191,22 @@ class RewardModel(pomdp_py.RewardModel):
     def sample(self, state, action, next_state):
         return self._reward_func(state, action)
     
+
+class RRSPProblem(pomdp_py.POMDP):
+
+    def __init__(self, obs_state, init_true_state, init_belief):
+        #defining the agent
+        self.agent = pomdp_py.Agent(init_belief, ObservationModel(obs_state), TransitionModel(),RewardModel(),PolicyModel())
+        
+        #defining the environment
+        self.env = pomdp_py.Environment(init_true_state, TransitionModel(), RewardModel())
+        
+        super().__init__(self.agent, self.env, name = "RRSPPRroblem")
+    
+    def update_observation_model(self, new_obs_state,obs_state, init_true_state, init_belief):
+        self.agent.observation_model = ObservationModel(new_obs_state)
+        
+        problem = RRSPProblem(obs_state, init_true_state, init_belief)
+        # ...
+        # After the agent observes a new state
+        problem.update_observation_model(new_obs_state)
