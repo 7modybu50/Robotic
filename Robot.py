@@ -306,8 +306,11 @@ class RRSPProblem(pomdp_py.POMDP):
     
     def update_observation_model(self, new_obs_state,obs_state, init_true_state, init_belief):
         self.agent.observation_model = ObservationModel(new_obs_state)
-        
         problem = RRSPProblem(obs_state, init_true_state, init_belief)
-        # ...
         # After the agent observes a new state
         problem.update_observation_model(new_obs_state)
+
+def main():
+    init_true_state = 
+    init_belief = 
+    rrspproblem = RRSPProblem(init_true_state, init_belief)
