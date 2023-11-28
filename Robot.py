@@ -310,6 +310,40 @@ class RRSPProblem(pomdp_py.POMDP):
         # After the agent observes a new state
         problem.update_observation_model(new_obs_state)
 
+def test_planner(rrsp_problem, planner, nsteps = , debug_tree = False):
+    for i in range(nsteps):
+        action = planner,plan(rrsp_problem)
+        if debug_tree:
+            from pomdp_py.utils import TreeDebugger
+            dd = TreeDebugger(rrsp_problem.agent.tree)
+            import pdb; pdb.set_trace()
+
+        print("==== Step %d ====" % (i+1))
+        print("True State:", rrsp_problem.env.state)
+        print("Belief State:", rrsp_problem.agent.belief)
+        print("Action:", action)
+
+        reward = rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, None)
+        print("Reward:", reward)
+
+        #Update Belief
+        planner.update_belief(rrsp_problem.agent, action, real_observation)
+        if isinstance(planner, pomdp_py.POUCT):
+            print("Num sims:", planner.last_num_sims)
+            print("Plan time: %5f" % planner.last_plan_time)
+
+        if isinstance(rrsp_problem.agent.cur_belief, pomdp_py.Histogram):
+            new_belief = pomdp_py.update_histogram_belief(
+                rrsp_problem.agent.cur_belief,
+                action, real_observation, rrsp_problem.agent.observation_model,
+                rrsp_problem.agent.transition_model
+            )
+            rrsp_problem.agent.set_belief(new_belief)
+
+        if action.name.startswith("play"):
+            print("\n")
+
+
 def main():
     init_true_state = 
     init_belief = 
