@@ -302,7 +302,7 @@ class RRSPProblem(pomdp_py.POMDP):
         #defining the environment
         env = pomdp_py.Environment(init_true_state, TransitionModel(), RewardModel())
         
-        super__init__(agent, env, name = "RRSPPRroblem")
+        super().__init__(agent, env, name = "RRSPPRroblem")
     
     def update_observation_model(self, new_obs_state,obs_state, init_true_state, init_belief):
         self.agent.observation_model = ObservationModel(new_obs_state)
