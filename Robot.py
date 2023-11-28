@@ -107,36 +107,58 @@ class TransitionModel(pomdp_py.TransitionModel):
         #Can the opponent make it end_state?
 
         #First find the opponents move required to get to the end_state
-        if (sum(end_state.points) > sum(end_state.points)): # player wins in end_state, opponent loses
-            opp_action = (standard.index(action[5]) + 2) % 3
-        elif (sum(end_state.opp_points) > sum(end_state.start_points)): #opponent wins in end_state, player loses
+        if (sum(end_state.myPoints) > sum(start_state.myPoints)): # player wins in end_state, opponent loses
             opp_action = (standard.index(action[5]) + 1) % 3
+        elif (sum(end_state.oPoints) > sum(start_state.oPoints)): # opponent wins in end_state, player loses
+            opp_action = (standard.index(action[5]) + 2) % 3
         else:
             opp_action = standard.index(action[5])
 
         #Secondly, calculate the probability that the opponent wants to play that card P(plays x):
-        # (1) Higher Probability of playing cards that have a chance of getting them a win (Offense)
-        # (2) Higher Probability of playing cards that block opponent wins (Offense)
+        # (1) Higher Probability of playing cards that have a chance of getting them a big win (Offense)
+        # (2) Higher Probability of playing cards that block our big win (defense)
         # (3) To play the card, they need it in hand
 
         #(1)
         #See how close the opponent is to achieving the win condition of "winning with 1 of each type"
-        if (start_state.opp_points[(opp_action+1)%3] >= 1) or (start_state.opp_points[(opp_action+2)%3] >= 1):
+        if (start_state.oPoints[(opp_action+1)%3] >= 1) or (start_state.oPoints[(opp_action+2)%3] >= 1):
             spread_win_closeness = 1/3
-            if (start_state.opp_points[(opp_action+1)%3] >= 1) or (start_state.opp_points[(opp_action+2)%3] >= 1):
+            if (start_state.oPoints[(opp_action+1)%3] >= 1) and (start_state.oPoints[(opp_action+2)%3] >= 1):
                 spread_win_closeness = 2/3
+        else:
+            spread_win_closeness = 0
 
         #Extract the win condition the opponent is closer to in the form of a fraction of "closeness"
         opp_win_closeness = max((start_state.opp_points[opp_action] / 3), spread_win_closeness)
 
+        #(2)
+        #Get highest point win type
+        highest = max(start_state.myPoints)
+        highest_types = []
+        for i in range(3):
+            if start_state.myPoints[i] == highest:
+                highest_types.append(i)
+
+        defense_effect = 0
+        if len(highest_types) != 3:
+            for item in highest_types:
+                if (item+1)%3 == opp_action:
+                    defense_effect += 0.6
+                elif item == opp_action:
+                    defense_effect += 0.4
+                else:
+                    defense_effect += 0.1                               # Maybe want negative value?
+            defense_effect = defense_effect / len(highest_types)
+
         #Calculate the probability of the opponent playing that card.
-        #play_x_prob = opp_win_closeness (some operator) player_win_closeness
+
+        play_x_prob = base + opp_win_closeness + defense_effect         # Probably not how math works
 
         #Thirdly, calculate the probability opponent plays that card given they've picked it up.
         #P(plays x | card_in_hand) = P(card_in_hand | plays x) * P(plays x) / P(card_in_hand)
 
-        # prime_prob = 1? * see below? / (num_x_unobserved / remaining_cards)
-        # return prime_prob
+        prime_prob = defense_effect / (num_x_unobserved / remaining_cards) #(3)
+        return prime_prob
 
 class RewardModel(pomdp_py.RewardModel):
     def _reward_func(self, state, action):
