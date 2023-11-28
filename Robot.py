@@ -295,14 +295,14 @@ class RewardModel(pomdp_py.RewardModel):
 
 class RRSPProblem(pomdp_py.POMDP):
 
-    def __init__(self, obs_state, init_true_state, init_belief):
+    def __init__(obs_state, init_true_state, init_belief):
         #defining the agent
-        self.agent = pomdp_py.Agent(init_belief, ObservationModel(obs_state), TransitionModel(),RewardModel(),PolicyModel())
+        agent = pomdp_py.Agent(init_belief, ObservationModel(obs_state), TransitionModel(),RewardModel(),PolicyModel())
         
         #defining the environment
-        self.env = pomdp_py.Environment(init_true_state, TransitionModel(), RewardModel())
+        env = pomdp_py.Environment(init_true_state, TransitionModel(), RewardModel())
         
-        super().__init__(self.agent, self.env, name = "RRSPPRroblem")
+        super__init__(agent, env, name = "RRSPPRroblem")
     
     def update_observation_model(self, new_obs_state,obs_state, init_true_state, init_belief):
         self.agent.observation_model = ObservationModel(new_obs_state)
