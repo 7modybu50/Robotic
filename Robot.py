@@ -161,54 +161,90 @@ class TransitionModel(pomdp_py.TransitionModel):
         return prime_prob
 
 class RewardModel(pomdp_py.RewardModel):
-    def _reward_func(self, state, action):
+    def _reward_func(self, state, action, next_state):
+
         # ignore variable names for now
+        oNextRock = next_state.oPoints[0]
+        oNextPaper = next_state.oPoints[1]
+        oNextScissors = next_state.oPoints[2]
+        
+        oRock = state.oPoints[0]
+        oPaper = state.oPoints[1]
+        oScissors = state.oPoints[2]
+
+        myRock = state.myPoints[0]
+        myPaper = state.myPoints[1]
+        myScissors = state.myPoints[2]
+
+        myNextRock = next_state.myPoints[0]
+        myNextPaper = next_state.myPoints[1]
+        myNextScissors = next_state.myPoints[2]
+
+        # In our version of RRPS, we have made the win condition more challenging than the typical best of 3. 
+        # A player can only win upon winning using the same type 3 times (over the course of the game) 
+        # or winning at least once with every type. 
+        # In terms of deck of cards, the player draws a hand of 5 cards each labelled with one of the three RPS types. 
+
         opponent_about_to_win = any(win == 2 for win in state.oPoints) or all(win >= 1 for win in state.oPoints)
         robot_about_to_win = any(win == 2 for win in state.myPoints) or all(win >= 1 for win in state.myPoints)
 
-        if opponent_about_to_win: 
-            # action[5:] gets the card played by the robot
-            if action[5:] == "rock" and state.name == "scissor":
-                return 100  # robot wins this round
-            elif action[5:] == "paper" and state.name == "rock":
-                return 100  # robot wins this round
-            elif action[5:] == "scissor" and state.name == "paper":
-                return 100  # robot wins this round
-            elif action[5:] == state.name:  
-                return -100  # draw
+        if opponent_about_to_win:
+            if action.name == "play_rock":
+                if oNextPaper == oPaper + 1 and oNextPaper == 3:
+                    return -500  # robot loses this round and the game
+                elif oNextPaper == oPaper + 1:
+                    return -300 # robot loses this round
+                elif oNextPaper == oPaper:
+                    return -100  # draw
+                else:
+                    return 100  # robot wins this round
+            elif action.name == "play_paper":
+                if oNextScissors == oScissors + 1 and oNextScissors == 3:
+                    return -500  # robot loses this round and the game
+                elif oNextScissors == oScissors + 1:
+                    return -300 # robot loses this round
+                elif oNextScissors == oScissors:
+                    return -100  # draw
+                else:
+                    return 100  # robot wins this round
+            elif action.name == "play_scissor":
+                if oNextRock == oRock + 1 and oNextRock == 3:
+                    return -500 # robot loses this round and the game
+                elif oNextRock == oRock + 1:
+                    return -300  # robot loses this round
+                elif oNextRock == oRock:
+                    return -100  # draw
+                else:
+                    return 100  # robot wins this round
             else:
-                return -500  # robot loses this round
+                return 0  # default case
         elif robot_about_to_win:
-            if action[5:] == "rock" and state.name == "scissor":
-                return 200  # robot wins the game
-            elif action[5:] == "paper" and state.name == "rock":
-                return 200  # robot wins the game
-            elif action[5:] == "scissor" and state.name == "paper":
-                return 200  # robot wins the game
-            else:
-                return 0  # draw or loses this round
+            if action.name == "play_rock":
+                if myRock == 0 and myNextRock == 1 or myNextRock == 3:
+                    return 200 # robot wins the game
+                elif myRock == 0 and myNextRock == 2:
+                    return 100 # robot wins this round
+                elif myRock == 0 and myNextRock == 0:
+                    return 0
+            elif action.name == "play_paper":
+                if myPaper == 0 and myNextPaper == 1 or myNextPaper == 3:
+                    return 200
+                elif myPaper == 0 and myNextPaper == 2:
+                    return 100
+                elif myPaper == 0 and myNextPaper == 0:
+                    return 0
+            elif action.name == "play_scissor":
+                if myScissors == 0 and myNextScissors == 1 or myNextScissors == 3:
+                    return 200
+                elif myScissors == 0 and myNextScissors == 2:
+                    return 100
+                elif myScissors == 0 and myNextScissors == 0:
+                    return 0
         else:
-            if action == "play_rock":
-                if state.name == "scissor":
-                    return 10  # robot wins this roundpi
-                elif state.name == "rock":
-                    return 0  # draw
-                else:
-                    return -100  # robot loses this round
-            elif action == "play_paper":
-                if state.name == "rock":
-                    return 10  # robot wins this round
-                elif state.name == "paper":
-                    return 0  # draw
-                else:
-                    return -100  # robot loses this round
-            elif action == "play_scissor":
-                if state.name == "paper":
-                    return 10  # robot wins this round
-                elif state.name == "scissor":
-                    return 0  # draw
-                else:
-                    return -100  # robot loses this round
+            if myPaper == 0 and myNextPaper == 1 or myRock == 0 and myNextRock == 1 or myScissors == 0 and myNextScissors == 1:
+                return 100
+            else:
+                return 0
     
     def sample(self, state, action, next_state):
         return self._reward_func(state, action)
