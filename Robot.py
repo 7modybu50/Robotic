@@ -1,5 +1,5 @@
 import pomdp_py
-
+from itertools import product
 
 class RRSPState(pomdp_py.State):
     def __init__(self, myPoints, oPoints, cards, oRock, oPaper, oScissor):
@@ -34,11 +34,12 @@ class RRSPAction(pomdp_py.Action):
 
 
 class RRSPObservation(pomdp_py.Observation):
-    def __init__(self, name):
+    def __init__(self, name, draw):
         self.name = name
+        self.draw = draw
     def __eq__(self, other):
         if isinstance(other, RRSPObservation):
-            return self.name == other.name
+            return self.name == other.name and self.draw == other.draw
         return False
 
 class ObservationModel(pomdp_py.ObservationModel):
@@ -47,52 +48,68 @@ class ObservationModel(pomdp_py.ObservationModel):
     def probability(self, observation, next_state, action):
         mPoints = sum(next_state.myPoints) - sum(self.current_state.myPoints)
         oPoints = sum(next_state.oPoints) - sum(self.current_state.oPoints)
+
         #the probability of the opponent's card if you played a rock card
+        prob = 0
         if action.name == "play_rock" and mPoints + oPoints == 0:
-            if observation == "rock": return 1
-            else: return 0
+            if observation.name == "rock":
+                prob = 0.9
+            else:
+                prob = 0.1
         elif action.name == "play_rock" and oPoints == 1:
-            if observation == "paper": return 1
-            else: return 0
+            if observation.name == "paper":
+                prob = 0.9
+            else:
+                prob = 0.1
         elif action.name == "play_rock" and mPoints == 1:
-            if observation == "scissor": return 1
-            else: return 0
+            if observation.name == "scissor":
+                prob = 0.9
+            else:
+                prob = 0.1
         # the probability of the opponent's card if you played a paper card
         elif action.name == "play_paper" and mPoints + oPoints == 0:
-            if observation == "paper":
-                return 1
+            if observation.name == "paper":
+                prob = 0.9
             else:
-                return 0
+                prob = 0.1
         elif action.name == "play_paper" and oPoints == 1:
-            if observation == "scissor":
-                return 1
+            if observation.name == "scissor":
+                prob = 0.9
             else:
-                return 0
+                prob = 0.1
         elif action.name == "play_paper" and mPoints == 1:
-            if observation == "rock":
-                return 1
+            if observation.name == "rock":
+                prob = 0.9
             else:
-                return 0
+                prob = 0.1
         # the probability of the opponent's card if you played a paper card
         elif action.name == "play_scissor" and mPoints + oPoints == 0:
-            if observation == "scissor":
-                return 1
+            if observation.name == "scissor":
+                prob = 0.9
             else:
-                return 0
+                prob = 0.1
         elif action.name == "play_scissor" and oPoints == 1:
-            if observation == "rock":
-                return 1
+            if observation.name == "rock":
+                prob = 0.9
             else:
-                return 0
+                prob = 0.1
         elif action.name == "play_scissor" and mPoints == 1:
-            if observation == "paper":
-                return 1
+            if observation.name == "paper":
+                prob = 0.9
             else:
-                return 0
-        else: return 0
-
+                prob = 0.1
+        else:
+            return 0
+        if observation.draw == "rock":
+            return prob * (10 - self.current_state.oRock)/(30 - (self.current_state.oRock + self.current_state.oPaper + self.current_state.oScissor))
+        elif observation.draw == "paper":
+            return prob * (10 - self.current_state.oPaper)/(30 - (self.current_state.oRock + self.current_state.oPaper + self.current_state.oScissor))
+        elif observation.draw == "paper":
+            return prob * (10 - self.current_state.oScissor)/(30 - (self.current_state.oRock + self.current_state.oPaper + self.current_state.oScissor))
+        else:
+            return prob
     def get_all_observations(self):
-        return [RRSPObservation(s) for s in ["rock", "paper", "scissor"]]
+        return [RRSPObservation(s, x) for s in ["rock", "paper", "scissor"] for x in ["rock", "paper", "scissor"]]
     def update_state(self, state):
         self.current_state = state
 
@@ -108,11 +125,11 @@ class TransitionModel(pomdp_py.TransitionModel):
 
         #First find the opponents move required to get to the end_state
         if (sum(end_state.myPoints) > sum(start_state.myPoints)): # player wins in end_state, opponent loses
-            opp_action = (standard.index(action[5]) + 1) % 3
+            opp_action = (standard.index(action.name[5]) + 1) % 3
         elif (sum(end_state.oPoints) > sum(start_state.oPoints)): # opponent wins in end_state, player loses
-            opp_action = (standard.index(action[5]) + 2) % 3
+            opp_action = (standard.index(action.name[5]) + 2) % 3
         else:
-            opp_action = standard.index(action[5])
+            opp_action = standard.index(action.name[5])
 
         #Secondly, calculate the probability that the opponent wants to play that card P(plays x):
         # (1) Higher Probability of playing cards that have a chance of getting them a big win (Offense)
@@ -156,10 +173,12 @@ class TransitionModel(pomdp_py.TransitionModel):
 
         #Thirdly, calculate the probability opponent plays that card given they've picked it up.
         #P(plays x | card_in_hand) = P(card_in_hand | plays x) * P(plays x) / P(card_in_hand)
-
-        prime_prob = defense_effect / (num_x_unobserved / remaining_cards) #(3)
+        if standard[opp_action] == "r":
+            prime_prob = defense_effect / (10 - start_state.oRock / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
         return prime_prob
 
+    def get_all_states(self):
+        return [RRSPState(a,b,c,d,e,f) for a in []]
 class RewardModel(pomdp_py.RewardModel):
     def _reward_func(self, state, action, next_state):
 
@@ -312,7 +331,7 @@ class RRSPProblem(pomdp_py.POMDP):
 
 def test_planner(rrsp_problem, planner, nsteps = , debug_tree = False):
     for i in range(nsteps):
-        action = planner,plan(rrsp_problem)
+        action = planner,planner(rrsp_problem)
         if debug_tree:
             from pomdp_py.utils import TreeDebugger
             dd = TreeDebugger(rrsp_problem.agent.tree)
