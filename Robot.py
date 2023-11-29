@@ -178,11 +178,11 @@ class TransitionModel(pomdp_py.TransitionModel):
         #P(plays x | card_in_hand) = P(card_in_hand | plays x) * P(plays x) / P(card_in_hand)
 
         if standard[opp_action] == 'r':
-            prime_prob = defense_effect / (10 - start_state.oRock / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
+            prime_prob = defense_effect * play_x_prob/ (10 - start_state.oRock / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
         if standard[opp_action] == 'p':
-            prime_prob = defense_effect / (10 - start_state.oPaper / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
+            prime_prob = defense_effect * play_x_prob/ (10 - start_state.oPaper / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
         else:
-            prime_prob = defense_effect / (10 - start_state.oScissor / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor)))
+            prime_prob = defense_effect * play_x_prob/ (10 - start_state.oScissor / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor)))
 
         return prime_prob
 
