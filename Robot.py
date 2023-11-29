@@ -13,9 +13,9 @@ class RRSPState(pomdp_py.State):
         self.oScissor = oScissor
 
     def __str__(self):
-        return "My points:\nrocks: " + str(self.myPoints[0]) + ", papers: " + str(
-            self.myPoints[1]) + ", scissors: " + str(self.myPoints[2]) + "Opponent's points:\nrocks: " + str(
-            self.oPoints[0]) + ", papers: " + str(self.oPoints[1]) + ", scissors: " + str(self.oPoints[2])
+        return "\nMy points:\nrocks: " + str(self.myPoints[0]) + ", papers: " + str(
+            self.myPoints[1]) + ", scissors: " + str(self.myPoints[2]) + "\n\nOpponent's points:\nrocks: " + str(
+            self.oPoints[0]) + ", papers: " + str(self.oPoints[1]) + ", scissors: " + str(self.oPoints[2]) + "\n"
     def __hash__(self):
         return hash(self.__str__())
     def __eq__(self, other):
@@ -395,15 +395,34 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
         dd = TreeDebugger(rrsp_problem.agent.tree)
         import pdb; pdb.set_trace()
 
+    true_state = rrsp_problem.env.state
+
     print("True State:", rrsp_problem.env.state)
-    print("Belief State:", rrsp_problem.agent.belief)
     print("Action:", action.name)
 
-    reward = max([rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state) for next_state in rrsp_problem.env.transition_model.get_all_states()])
+    real_observation = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
+    print(action.name[5])
+    print(real_observation.name[0])
+    if ((standard.index(action.name[5])+2) % 3) == (standard.index(real_observation.name[0])):
+        next_state = true_state
+        next_state.myPoints[standard.index(action.name[5])] += 1
+        print("I won")
+    elif ((standard.index(action.name[5])+1) % 3) == (standard.index(real_observation.name[0])):
+        next_state = true_state
+        next_state.oPoints[standard.index(real_observation.name[0])] += 1
+        print("I lost")
+    else:
+        next_state = true_state
+        print("draw")
+
+    reward = rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state)
     print("Reward:", reward)
 
+    rrsp_problem.env.apply_transition(next_state)
+    print("New State:", rrsp_problem.env.state)
+
     #real_observation = rrsp_problem.env.observation_model.sample(rrsp_problem.env.state, action)
-    real_observation = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
+    #real_observation = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
     print("Observation:", real_observation.name)
     rrsp_problem.agent.update_history(action, real_observation)
 
@@ -423,7 +442,7 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
             rrsp_problem.agent.transition_model
         )
         rrsp_problem.agent.set_belief(new_belief)
-
+    rrsp_problem.agent.observation_model.update_state(saved_state)
     return saved_state
             
 def initialize_state(end_state = None):
@@ -457,7 +476,18 @@ def main():
                            rollout_policy=rrspproblem.agent.policy_model,
                            show_progress=True)
     test_planner(rrspproblem, pouct)
-    TreeDebugger(rrspproblem.agent.tree).pp
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    #TreeDebugger(rrspproblem.agent.tree).pp
 
     # Reinitialize state with end state
     init_true_state = initialize_state()
