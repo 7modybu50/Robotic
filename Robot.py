@@ -1,4 +1,5 @@
 import pomdp_py
+from pomdp_py import *
 from itertools import product
 import random
 
@@ -187,6 +188,12 @@ class TransitionModel(pomdp_py.TransitionModel):
         return prime_prob
 
     def sample(self, state, action):
+        probabilities = [self.probability(ss,state,action) for state in self.get_all_states()]
+        remaining = 1 - sum(probabilities)
+
+        for i in range(len(probabilities)-1):
+            probabilities[i] += remaining/len(probabilities)
+
         return random.choices(self.get_all_states(), [self.probability(ss,state,action) for state in self.get_all_states()])
     def get_all_states(self):
 
@@ -284,8 +291,6 @@ class RewardModel(pomdp_py.RewardModel):
     def sample(self, state, action, next_state):
         return self._reward_func(state, action)
 
-
-
 # class RewardModel(pomdp_py.RewardModel):
 #     def _reward_func(self, state, action, next_state):
     
@@ -348,7 +353,7 @@ class PolicyModel(pomdp_py.RolloutPolicy): #TODO: just a placeholder for now
         """Treating this PolicyModel as a rollout policy"""
         return self.sample(state)
 
-    def get_all_actions(self, state=None, history=None):
+    def get_all_actions(self, state, history):
         return PolicyModel.ACTIONS
 
 class RRSPProblem(pomdp_py.POMDP):
@@ -431,7 +436,7 @@ def main():
     # Run planner
     # vi = pomdp_py.ValueIteration(horizon=3, discount_factor=0.95)
 
-    end_state = test_planner(test_planner(rrspproblem, pomdp_py.POUCT(max_depth=10, num_sims=1000), nsteps=100, debug_tree=False), pomdp_py.POUCT(max_depth=10, num_sims=1000), nsteps=100, debug_tree=False)
+    end_state = test_planner(rrspproblem, pomdp_py.POUCT(max_depth=10, num_sims=1000), debug_tree=False)
     
     # Reinitialize state with end state
     init_true_state = initialize_state(end_state)
