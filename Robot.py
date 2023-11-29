@@ -435,11 +435,23 @@ def main():
 
     # Run planner
     # vi = pomdp_py.ValueIteration(horizon=3, discount_factor=0.95)
+    # test_planner(rrspproblem, vi)
 
-    end_state = test_planner(rrspproblem, pomdp_py.POUCT(max_depth=10, num_sims=1000), debug_tree=False)
+    # end_state = initialize_state()
     
+    # Reset agent belief
+    rrspproblem.agent.set_belief(init_belief, prior=True)
+
+    print("\n** Testing POUCT **")
+    pouct = pomdp_py.POUCT(max_depth=3, discount_factor=0.95,
+                           num_sims=4096, exploration_const=50,
+                           rollout_policy=rrspproblem.agent.policy_model,
+                           show_progress=True)
+    test_planner(rrspproblem, pouct)
+    TreeDebugger(rrspproblem.agent.tree).pp
+
     # Reinitialize state with end state
-    init_true_state = initialize_state(end_state)
+    init_true_state = initialize_state()
     init_belief = pomdp_py.Histogram({init_true_state: 1.0})
     rrspproblem = RRSPProblem(init_true_state, init_belief)
 
