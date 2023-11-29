@@ -334,11 +334,32 @@ class RewardModel(pomdp_py.RewardModel):
     # def sample(self, state, action, next_state):
     #     return self._reward_func(state, action, next_state)
 
+
+# Policy Model
+class PolicyModel(pomdp_py.RolloutPolicy): #TODO: just a placeholder for now
+    """A simple policy model with uniform prior over a
+       small, finite action space"""
+    ACTIONS = [RRSPAction("play_rock"), RRSPAction("play_paper"), RRSPAction("play_scissor")]
+
+    def sample(self, state):
+        return random.sample(self.get_all_actions(), 1)[0]
+
+    def rollout(self, state, history=None):
+        """Treating this PolicyModel as a rollout policy"""
+        return self.sample(state)
+
+    def get_all_actions(self, state=None, history=None):
+        return PolicyModel.ACTIONS
+
 class RRSPProblem(pomdp_py.POMDP):
 
     def __init__(obs_noise, init_true_state, init_belief):
         #defining the agent
-        agent = pomdp_py.Agent(init_belief, ObservationModel(obs_noise), TransitionModel(),RewardModel(),PolicyModel())
+        agent = pomdp_py.Agent(init_belief,
+                               PolicyModel(),
+                               TransitionModel(),
+                               ObservationModel(obs_noise),
+                               RewardModel())        
         
         #defining the environment
         env = pomdp_py.Environment(init_true_state, TransitionModel(), RewardModel())
@@ -352,7 +373,7 @@ class RRSPProblem(pomdp_py.POMDP):
         problem.update_observation_model(new_obs_state)
 
 def test_planner(rrsp_problem, planner, debug_tree = False):
-    action = planner.plan(rrsp_problem)
+    action = planner.plan(rrsp_problem.agent)
     if debug_tree:
         from pomdp_py.utils import TreeDebugger
         dd = TreeDebugger(rrsp_problem.agent.tree)
@@ -408,9 +429,14 @@ def main():
     rrspproblem = RRSPProblem(init_true_state, init_belief)
 
     # Run planner
-    end_state = test_planner(rrspproblem, test_planner)
+    # vi = pomdp_py.ValueIteration(horizon=3, discount_factor=0.95)
+
+    end_state = test_planner(test_planner(rrspproblem, pomdp_py.POUCT(max_depth=10, num_sims=1000), nsteps=100, debug_tree=False), pomdp_py.POUCT(max_depth=10, num_sims=1000), nsteps=100, debug_tree=False)
     
     # Reinitialize state with end state
     init_true_state = initialize_state(end_state)
     init_belief = pomdp_py.Histogram({init_true_state: 1.0})
     rrspproblem = RRSPProblem(init_true_state, init_belief)
+
+if __name__ == '__main__':
+    main()
