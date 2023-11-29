@@ -43,6 +43,8 @@ class RRSPObservation(pomdp_py.Observation):
         if isinstance(other, RRSPObservation):
             return self.name == other.name and self.draw == other.draw
         return False
+    def __hash__(self):
+        return hash(self.name + self.draw)
 
 class ObservationModel(pomdp_py.ObservationModel):
     def __init__(self, current_state):
@@ -112,6 +114,15 @@ class ObservationModel(pomdp_py.ObservationModel):
             return prob
     def get_all_observations(self):
         return [RRSPObservation(s, x) for s in ["rock", "paper", "scissor"] for x in ["rock", "paper", "scissor"]]
+
+    def sample(self, next_state, action):
+        probabilities = [self.probability(obs, next_state, action) for obs in self.get_all_observations()]
+        remaining = 1 - sum(probabilities)
+
+        for i in range(len(probabilities) - 1):
+            probabilities[i] += remaining / len(probabilities)
+
+        return random.choices(self.get_all_observations(), probabilities)[0]
     def update_state(self, state):
         self.current_state = state
 
@@ -194,7 +205,7 @@ class TransitionModel(pomdp_py.TransitionModel):
         for i in range(len(probabilities)-1):
             probabilities[i] += remaining/len(probabilities)
 
-        return random.choices(self.get_all_states(), [self.probability(ss,state,action) for state in self.get_all_states()])
+        return random.choices(self.get_all_states(), probabilities)[0]
     def get_all_states(self):
 
         states = [ss]         # all draws
@@ -289,7 +300,7 @@ class RewardModel(pomdp_py.RewardModel):
                 return 0
     
     def sample(self, state, action, next_state):
-        return self._reward_func(state, action)
+        return self._reward_func(state, action, next_state)
 
 # class RewardModel(pomdp_py.RewardModel):
 #     def _reward_func(self, state, action, next_state):
@@ -353,17 +364,17 @@ class PolicyModel(pomdp_py.RolloutPolicy): #TODO: just a placeholder for now
         """Treating this PolicyModel as a rollout policy"""
         return self.sample(state)
 
-    def get_all_actions(self, state, history):
+    def get_all_actions(self, state=None, history=None):
         return PolicyModel.ACTIONS
 
 class RRSPProblem(pomdp_py.POMDP):
 
-    def __init__(obs_noise, init_true_state, init_belief):
+    def __init__(self,init_true_state, init_belief):
         #defining the agent
         agent = pomdp_py.Agent(init_belief,
                                PolicyModel(),
                                TransitionModel(),
-                               ObservationModel(obs_noise),
+                               ObservationModel(init_true_state),
                                RewardModel())        
         
         #defining the environment
@@ -386,23 +397,24 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
 
     print("True State:", rrsp_problem.env.state)
     print("Belief State:", rrsp_problem.agent.belief)
-    print("Action:", action)
+    print("Action:", action.name)
 
-    reward = rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, None)
+    reward = max([rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state) for next_state in rrsp_problem.env.transition_model.get_all_states()])
     print("Reward:", reward)
 
-    real_observation = rrsp_problem.env.observation_model.sample(rrsp_problem.env.state, action)
-    print("Observation:", real_observation)
+    #real_observation = rrsp_problem.env.observation_model.sample(rrsp_problem.env.state, action)
+    real_observation = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
+    print("Observation:", real_observation.name)
     rrsp_problem.agent.update_history(action, real_observation)
 
     # Save the state
     saved_state = rrsp_problem.env.state
 
     #Update Belief
-    planner.update_belief(rrsp_problem.agent, action, real_observation)
+    planner.update(rrsp_problem.agent, action, real_observation)
     if isinstance(planner, pomdp_py.POUCT):
         print("Num sims:", planner.last_num_sims)
-        print("Plan time: %2f" % planner.last_plan_time)
+        print("Plan time: %2f" % planner.last_planning_time)
 
     if isinstance(rrsp_problem.agent.cur_belief, pomdp_py.Histogram):
         new_belief = pomdp_py.update_histogram_belief(
@@ -412,18 +424,15 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
         )
         rrsp_problem.agent.set_belief(new_belief)
 
-    if action.name.startswith("play"):
-        print("\n")
-
     return saved_state
             
 def initialize_state(end_state = None):
     if end_state is None:
         total_cards = 3
-        rocks_count = random.randint(0, total_cards)
-        papers_count = random.randint(0, total_cards - rocks_count)
-        scissors_count = total_cards - rocks_count - papers_count
-        return RRSPState([0,0,0], [0,0,0], [rocks_count, papers_count, scissors_count], 0, 0, 0)
+        rocks_count = 2 #random.randint(0, total_cards)
+        papers_count = 2#random.randint(0, total_cards - rocks_count)
+        scissors_count = 1#total_cards - rocks_count - papers_count
+        return RRSPState([0,0,0], [0,0,0], [rocks_count, papers_count, scissors_count], rocks_count, papers_count, scissors_count)
     else:
         # Use end state to initialize the new state
         return RRSPState(end_state.myPoints, end_state.oPoints, end_state.cards, end_state.oRock, end_state.oPaper, end_state.oScissor)
