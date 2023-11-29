@@ -2,7 +2,7 @@ import pomdp_py
 from pomdp_py import *
 from itertools import product
 import random
-
+import logic
 class RRSPState(pomdp_py.State):
     def __init__(self, myPoints, oPoints, cards, oRock, oPaper, oScissor):
         self.myPoints = myPoints  # the robot's points
@@ -53,7 +53,44 @@ class ObservationModel(pomdp_py.ObservationModel):
     def probability(self, observation, next_state, action):
         mPoints = sum(next_state.myPoints) - sum(self.current_state.myPoints)
         oPoints = sum(next_state.oPoints) - sum(self.current_state.oPoints)
-
+        if mPoints == oPoints:
+            if action.name == "play_rock" and next_state.oRock - self.current_state.oRock < 1:
+                return 0
+            elif action.name == "play_paper" and next_state.oPaper - self.current_state.oPaper < 1:
+                return 0
+            elif action.name == "play_scissor" and next_state.oScissor - self.current_state.oScissor < 1:
+                return 0
+        elif mPoints > oPoints:
+            if action.name == "play_rock" and next_state.oScissor - self.current_state.oScissor < 1:
+                return 0
+            if action.name == "play_paper" and next_state.oRock - self.current_state.oRock < 1:
+                return 0
+            if action.name == "play_scissor" and next_state.oPaper - self.current_state.oPaper < 1:
+                return 0
+        elif mPoints < oPoints:
+            if action.name == "play_rock" and next_state.oPaper - self.current_state.oPaper < 1:
+                return 0
+            if action.name == "play_paper" and next_state.oScissor - self.current_state.oScissor < 1:
+                return 0
+            if action.name == "play_scissor" and next_state.oRock - self.current_state.oRock < 1:
+                return 0
+        if action.name[5:] not in self.current_state.cards:
+            return 0
+        for x in range(len(self.current_state.cards)):
+            if self.current_state.cards[x] != next_state.cards[x] and action.name[5:] != self.current_state.cards[x]:
+                return 0
+        if next_state.myPoints[0] - self.current_state.myPoints[0] == 1 and action.name != "play_rock":
+            return 0
+        elif next_state.myPoints[1] - self.current_state.myPoints[1] == 1 and action.name != "play_paper":
+            return 0
+        elif next_state.myPoints[2] - self.current_state.myPoints[2] == 1 and action.name != "play_scissor":
+            return 0
+        elif next_state.oPoints[0] - self.current_state.oPoints[0] == 1 and action.name != "play_scissor":
+            return 0
+        elif next_state.oPoints[1] - self.current_state.oPoints[1] == 1 and action.name != "play_rock":
+            return 0
+        elif next_state.oPoints[2] - self.current_state.oPoints[2] == 1 and action.name != "play_paper":
+            return 0
         #the probability of the opponent's card if you played a rock card
         prob = 0
         if action.name == "play_rock" and mPoints + oPoints == 0:
@@ -135,6 +172,34 @@ class TransitionModel(pomdp_py.TransitionModel):
     def __init__(self, cur_state):
         self.cur_state = cur_state
     def probability(self, start_state, end_state, action):
+        mPoints = sum(end_state.myPoints) - sum(start_state.myPoints)
+        oPoints = sum(end_state.oPoints) - sum(start_state.oPoints)
+        if mPoints == oPoints:
+            if action.name == "play_rock" and end_state.oRock - start_state.oRock < 1:
+                return 0
+            elif action.name == "play_paper" and end_state.oPaper - start_state.oPaper < 1:
+                return 0
+            elif action.name == "play_scissor" and end_state.oScissor - start_state.oScissor < 1:
+                return 0
+        elif mPoints > oPoints:
+            if action.name == "play_rock" and end_state.oScissor - start_state.oScissor < 1:
+                return 0
+            if action.name == "play_paper" and end_state.oRock - start_state.oRock < 1:
+                return 0
+            if action.name == "play_scissor" and end_state.oPaper - start_state.oPaper < 1:
+                return 0
+        elif mPoints < oPoints:
+            if action.name == "play_rock" and end_state.oPaper - start_state.oPaper < 1:
+                return 0
+            if action.name == "play_paper" and end_state.oScissor - start_state.oScissor < 1:
+                return 0
+            if action.name == "play_scissor" and end_state.oRock - start_state.oRock < 1:
+                return 0
+        if action.name[5:] not in start_state.cards:
+            return 0
+        for x in range(len(start_state.cards)):
+            if start_state.cards[x] != end_state.cards[x] and action.name[5:] != start_state.cards[x]:
+                return 0
         if end_state.myPoints[0] - start_state.myPoints[0] == 1 and action.name != "play_rock":
             return 0
         elif end_state.myPoints[1] - start_state.myPoints[1] == 1 and action.name != "play_paper":
@@ -334,6 +399,8 @@ class TransitionModel(pomdp_py.TransitionModel):
                           self.replace(ss.cards, "scissor", "scissor"), ss.oRock+1, ss.oPaper,
                           ss.oScissor+1))
         return states
+    def update(self, new_state):
+        self.cur_state = new_state
 
 class RewardModel(pomdp_py.RewardModel):
     def _reward_func(self, state, action, next_state):
@@ -480,8 +547,15 @@ class PolicyModel(pomdp_py.RolloutPolicy): #TODO: just a placeholder for now
         """Treating this PolicyModel as a rollout policy"""
         return self.sample(state)
 
-    def get_all_actions(self, state=None, history=None):
-        return PolicyModel.ACTIONS
+    def get_all_actions(self, **kwargs):
+        state = kwargs.get("state", None)
+        if state == None:
+            return self.ACTIONS
+        else:
+            actions = []
+            for x in state.cards:
+                actions.append(RRSPAction("play_"+x))
+            return actions
 
 class RRSPProblem(pomdp_py.POMDP):
 
@@ -515,13 +589,22 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
     print("Belief State:", rrsp_problem.agent.belief)
     print("Action:", action.name)
 
-    reward = rrsp_problem.env.state_transition(action, execute=True)
+    #recieve the infomation
+    rob = logic.player
+    opp = logic.player
+
+    #end of information reception
+
+    reward = rrsp_problem.env.state_transition(action, execute=False)
     print("Reward:", reward)
 
     #real_observation = rrsp_problem.env.observation_model.sample(rrsp_problem.env.state, action)
-    real_observation = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
+    real_observation = RRSPObservation("rock", draw)
+    rrsp_problem.env.apply_transition(new_state)
     print("Observation:", rrsp_problem.env.state)
     rrsp_problem.agent.update_history(action, real_observation)
+    rrsp_problem.env.transition_model.update(rrsp_problem.env.state)
+    rrsp_problem.agent.observation_model.update_state(rrsp_problem.env.state)
 
     # Save the state
     saved_state = rrsp_problem.env.state
@@ -539,6 +622,7 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
             rrsp_problem.agent.transition_model
         )
         rrsp_problem.agent.set_belief(new_belief)
+
 
     return saved_state
             
@@ -568,12 +652,14 @@ def main():
     rrspproblem.agent.set_belief(init_belief, prior=True)
 
     print("\n** Testing POUCT **")
-    pouct = pomdp_py.POUCT(max_depth=3, discount_factor=0.95,
+    rrspproblem.agent.set_belief(pomdp_py.Particles.from_histogram(init_belief, num_particles=100), prior=True)
+    pouct = pomdp_py.POMCP(max_depth=3, discount_factor=0.95,
                            num_sims=4096, exploration_const=50,
                            rollout_policy=rrspproblem.agent.policy_model,
-                           show_progress=True)
+                           show_progress=True, pbar_update_interval=500)
     test_planner(rrspproblem, pouct)
-    TreeDebugger(rrspproblem.agent.tree).pp
+    test_planner(rrspproblem, pouct)
+    #TreeDebugger(rrspproblem.agent.tree).pp
 
     # Reinitialize state with end state
     init_true_state = initialize_state()

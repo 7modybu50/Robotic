@@ -4,9 +4,9 @@ TOTAL_CARDS = 5
 WIN_SIZE_X = 900
 WIN_SIZE_Y = 600
 
-rocks = 100
-papers = 100
-scissors = 100
+rocks = 10
+papers = 10
+scissors = 10
 
 class player:
 
@@ -45,16 +45,16 @@ def drawCard():
             if rocks == 0:
                 continue
             rocks -= 1
-            return 'r'
+            return 'rock'
         
         elif rand == 2:
             if papers == 0:
                 continue
             papers -= 1
-            return 'p'
+            return 'paper'
         
         elif rand == 3:
             if scissors == 0:
                 continue
             scissors -= 1
-            return 's'
+            return 'scissor'
