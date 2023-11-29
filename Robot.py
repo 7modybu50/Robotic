@@ -1,5 +1,6 @@
 import pomdp_py
 from itertools import product
+import random
 
 class RRSPState(pomdp_py.State):
     def __init__(self, myPoints, oPoints, cards, oRock, oPaper, oScissor):
@@ -329,15 +330,15 @@ class RRSPProblem(pomdp_py.POMDP):
         # After the agent observes a new state
         problem.update_observation_model(new_obs_state)
 
-def test_planner(rrsp_problem, planner, nsteps = , debug_tree = False):
+def test_planner(rrsp_problem, planner, nsteps = 100, debug_tree = False):
     for i in range(nsteps):
-        action = planner,planner(rrsp_problem)
+        action = planner.plan(rrsp_problem)
         if debug_tree:
             from pomdp_py.utils import TreeDebugger
             dd = TreeDebugger(rrsp_problem.agent.tree)
             import pdb; pdb.set_trace()
 
-        print("==== Step %d ====" % (i+1))
+        print("Step %d " % (i+1))
         print("True State:", rrsp_problem.env.state)
         print("Belief State:", rrsp_problem.agent.belief)
         print("Action:", action)
@@ -345,11 +346,15 @@ def test_planner(rrsp_problem, planner, nsteps = , debug_tree = False):
         reward = rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, None)
         print("Reward:", reward)
 
+        real_observation = rrsp_problem.env.observation_model.sample(rrsp_problem.env.state, action)
+        print("Observation:", real_observation)
+        rrsp_problem.agent.update_history(action, real_observation)
+
         #Update Belief
         planner.update_belief(rrsp_problem.agent, action, real_observation)
         if isinstance(planner, pomdp_py.POUCT):
             print("Num sims:", planner.last_num_sims)
-            print("Plan time: %5f" % planner.last_plan_time)
+            print("Plan time: %2f" % planner.last_plan_time)
 
         if isinstance(rrsp_problem.agent.cur_belief, pomdp_py.Histogram):
             new_belief = pomdp_py.update_histogram_belief(
@@ -361,9 +366,21 @@ def test_planner(rrsp_problem, planner, nsteps = , debug_tree = False):
 
         if action.name.startswith("play"):
             print("\n")
+            
+            
+            
+def initialize_state():
+    total_cards = 3
+
+    rocks_count = random.randint(0, total_cards)
+    papers_count = random.randint(0, total_cards - rocks_count)
+    scissors_count = total_cards - rocks_count - papers_count
+
+    return RRSPState([0,0,0], [0,0,0], [rocks_count, papers_count, scissors_count], 0, 0, 0)
+
 
 
 def main():
-    init_true_state = 
-    init_belief = 
+    init_true_state = initialize_state() 
+    init_belief = pomdp_py.Histogram({init_true_state: 1.0}) 
     rrspproblem = RRSPProblem(init_true_state, init_belief)
