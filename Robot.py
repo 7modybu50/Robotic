@@ -115,8 +115,10 @@ class ObservationModel(pomdp_py.ObservationModel):
         self.current_state = state
 
 
-
 standard = ['r','p','s'] #Put somewhere
+global ss
+ss = RRSPState([0,0,0], [0,0,0], ['-','-','-','-','-'], 0,0,0)
+
 class TransitionModel(pomdp_py.TransitionModel):
     def probability(self, start_state, end_state, action):
 
@@ -147,7 +149,7 @@ class TransitionModel(pomdp_py.TransitionModel):
             spread_win_closeness = 0
 
         #Extract the win condition the opponent is closer to in the form of a fraction of "closeness"
-        opp_win_closeness = max((start_state.opp_points[opp_action] / 3), spread_win_closeness)
+        opp_win_closeness = max((start_state.oPoints[opp_action] / 3), spread_win_closeness)
 
         #(2)
         #Get highest point win type
@@ -174,12 +176,30 @@ class TransitionModel(pomdp_py.TransitionModel):
 
         #Thirdly, calculate the probability opponent plays that card given they've picked it up.
         #P(plays x | card_in_hand) = P(card_in_hand | plays x) * P(plays x) / P(card_in_hand)
-        if standard[opp_action] == "r":
+
+        if standard[opp_action] == 'r':
             prime_prob = defense_effect / (10 - start_state.oRock / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
+        if standard[opp_action] == 'p':
+            prime_prob = defense_effect / (10 - start_state.oPaper / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
+        else:
+            prime_prob = defense_effect / (10 - start_state.oScissor / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor)))
+
         return prime_prob
 
+    def sample(self, state, action):
+        return random.choices(self.get_all_states(), [self.probability(ss,state,action) for state in self.get_all_states()])
     def get_all_states(self):
-        return [RRSPState(a,b,c,d,e,f) for a in [] for b in [] for c in [] for d in [] for e in [] for f in []]
+
+        states = [ss]         # all draws
+
+        states.append(RRSPState([ss.myPoints[0] + 1, ss.myPoints[1], ss.myPoints[2]], ss.oPoints, ss.cards, ss.oRock, ss.oPaper, ss.oScissor))    #all wins
+        states.append(RRSPState([ss.myPoints[0], ss.myPoints[1] + 1, ss.myPoints[2]], ss.oPoints, ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
+        states.append(RRSPState([ss.myPoints[0], ss.myPoints[1], ss.myPoints[2] + 1], ss.oPoints, ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
+        states.append(RRSPState(ss.myPoints, [ss.oPoints[0] + 1, ss.oPoints[1], ss.oPoints[2]], ss.cards, ss.oRock, ss.oPaper, ss.oScissor))       #all losses
+        states.append(RRSPState(ss.myPoints, [ss.oPoints[0], ss.oPoints[1] + 1, ss.oPoints[2]], ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
+        states.append(RRSPState(ss.myPoints, [ss.oPoints[0], ss.oPoints[1], ss.oPoints[2] + 1], ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
+
+        return states
 
 class RewardModel(pomdp_py.RewardModel):
     def _reward_func(self, state, action, next_state):
