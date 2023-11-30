@@ -1,4 +1,3 @@
-import threading
 import time
 import socket
 from pomdp_py import *
@@ -350,9 +349,8 @@ class RewardModel(pomdp_py.RewardModel):
         return self._reward_func(state, action, next_state)
 
 # Policy Model
-class PolicyModel(pomdp_py.RolloutPolicy): #TODO: just a placeholder for now
-    """A simple policy model with uniform prior over a
-       small, finite action space"""
+class PolicyModel(pomdp_py.RolloutPolicy):
+
     ACTIONS = [RRSPAction("play_rock"), RRSPAction("play_paper"), RRSPAction("play_scissor")]
 
     def sample(self, state):
@@ -397,7 +395,7 @@ class RRSPProblem(pomdp_py.POMDP):
         #defining the environment
         env = pomdp_py.Environment(init_true_state, TransitionModel(), RewardModel())
         
-        super().__init__(agent, env, name = "RRSPPRroblem")
+        super().__init__(agent, env, name="RRSPProblem")
 
 
 def test_planner(rrsp_problem, planner, skt, debug_tree=False):

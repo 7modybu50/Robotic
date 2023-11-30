@@ -14,6 +14,7 @@ WIN_SIZE_Y = 700
 window = tk.Tk()
 
 cardslots = []
+lastbutton = 0
 
 def screenGen(window, skt):
     #Window generation
@@ -41,18 +42,14 @@ def screenGen(window, skt):
 
 def sendChoice(buttonNumber, skt):
     msg = cards[buttonNumber].encode('utf-8')
-    print(cards)
-    print(buttonNumber)
-    print(cards[buttonNumber])
+    global lastbutton
+    lastbutton = buttonNumber
     skt.sendall(msg)
-
-    
-    
     toggleButtons()
 
 def toggleButtons():
     for card in cardslots:
-        if card['state'] == "normal":
+        if card['state'] == "normal" or card['state'] == "active":
             card.configure(state="disabled")
         else:
             card.configure(state="normal")
@@ -101,6 +98,18 @@ def gameProcessor():
             time.sleep(10)
             window.destroy()
 
+        global lastbutton
+        newCard = skt.recv(1).decode('utf-8')
+        print(newCard)
+        if newCard == 'r':
+            cardslots[lastbutton].configure(text="rock")
+            cards[lastbutton] = 'r'
+        elif newCard == 'p':
+            cardslots[lastbutton].configure(text="paper")
+            cards[lastbutton] = 'p'
+        else:
+            cardslots[lastbutton].configure(text="scissor")
+            cards[lastbutton] = 's'
 
 # -- Connect To Server -- #
 
@@ -109,24 +118,24 @@ skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 if connectToServer(skt):
 
     print("Waiting for Player 2...")                        # Waits to recieve ready (or any 5 bytes lol)
-    skt.recv(5) 
+    skt.recv(5)
     print("Player 2 connected")
-    
+
 # -- Setup GUI & Game objects -- #
 
     cardslots = screenGen(window, skt)                                  # Load GUI
-    
+
     cards = skt.recv(10).decode('utf-8').split('|')       # Probably could see abt reducing from 1024 ??? CALL_POINT_1
 
     for i in range(len(cards)):                           # Sets the cards in the GUI slots
         if cards[i] == 'r':
-            cardslots[i].config(text="Rock")
+            cardslots[i].config(text="rock")
         elif cards[i] == 'p':
-            cardslots[i].config(text="Paper")
+            cardslots[i].config(text="paper")
         elif cards[i] == 's':
-            cardslots[i].config(text="Scissors")
+            cardslots[i].config(text="scissor")
         else:
-            cardslots[i].config(text="None")
+            cardslots[i].config(text="none")
 
 # -- Play Game -- #
 
@@ -134,8 +143,6 @@ if connectToServer(skt):
     thread.start()
 
     tk.mainloop()
-    # tkinter updates scorebar!!!! - TODO
-    
 
 # -- Clean Up Everything -- #
     thread.join()

@@ -99,7 +99,7 @@ def main(con, addr):
         choices.pop()
         lock.release()
 
-        print(player.points)
+        print("\nNew Card:", new_card, "\n")
 
         checkpoint.wait()
 
