@@ -1,3 +1,6 @@
+from pickle import NONE
+import re
+from turtle import delay
 import pomdp_py
 from pomdp_py import *
 from itertools import product
@@ -16,6 +19,8 @@ class RRSPState(pomdp_py.State):
         return "\nMy points:\nrocks: " + str(self.myPoints[0]) + ", papers: " + str(
             self.myPoints[1]) + ", scissors: " + str(self.myPoints[2]) + "\n\nOpponent's points:\nrocks: " + str(
             self.oPoints[0]) + ", papers: " + str(self.oPoints[1]) + ", scissors: " + str(self.oPoints[2]) + "\n"
+    def __repr__(self):
+        return self.__str__()
     def __hash__(self):
         return hash(self.__str__())
     def __eq__(self, other):
@@ -31,6 +36,10 @@ class RRSPAction(pomdp_py.Action):
         if isinstance(other, RRSPAction):
             return self.name == other.name
         return False
+    
+    def __str__(self):
+        return self.name
+    
     def __hash__(self):
         return hash(self.name)
 
@@ -43,6 +52,8 @@ class RRSPObservation(pomdp_py.Observation):
         if isinstance(other, RRSPObservation):
             return self.name == other.name and self.draw == other.draw
         return False
+    def __str__(self):
+        return self.name + " " + self.draw
     def __hash__(self):
         return hash(self.name + self.draw)
 
@@ -220,7 +231,29 @@ class TransitionModel(pomdp_py.TransitionModel):
 class RewardModel(pomdp_py.RewardModel):
     def _reward_func(self, state, action, next_state):
 
-        # ignore variable names for now
+        if isinstance(next_state, RRSPObservation):
+            if next_state.name == "rock":
+                if action.name == "play_rock":
+                    return 0
+                elif action.name == "play_paper":
+                    return 100
+                elif action.name == "play_scissor":
+                    return 200
+            elif next_state.name == "paper":
+                if action.name == "play_rock":
+                    return -200
+                elif action.name == "play_paper":
+                    return 0
+                elif action.name == "play_scissor":
+                    return 100
+            elif next_state.name == "scissor":
+                if action.name == "play_rock":
+                    return 100
+                elif action.name == "play_paper":
+                    return -200
+                elif action.name == "play_scissor":
+                    return 0
+            
         oNextRock = next_state.oPoints[0]
         oNextPaper = next_state.oPoints[1]
         oNextScissors = next_state.oPoints[2]
@@ -268,7 +301,7 @@ class RewardModel(pomdp_py.RewardModel):
                 else:
                     return 100  # other cases not leading robot to lose the game
             else:
-                return 0  # default case
+                return 1  # default case for debugging
         elif robot_about_to_win:
             if action.name == "play_rock":
                 if myRock == 0 and myNextRock == 1 or myNextRock == 3:
@@ -285,6 +318,8 @@ class RewardModel(pomdp_py.RewardModel):
                     return 200
                 else:
                     return 0 # other cases not leading robot to win the game
+            else:
+                return 1.0001  # default case
         else:
             if myPaper == 0 and myNextPaper == 1 or myRock == 0 and myNextRock == 1 or myScissors == 0 and myNextScissors == 1:
                 return 100
@@ -295,7 +330,7 @@ class RewardModel(pomdp_py.RewardModel):
             elif oPaper == 1 and oNextPaper == 2 or oRock == 1 and oNextRock == 2 or oScissors == 1 and oNextScissors == 2:
                 return -300
             else:
-                return 0
+                return 1.0000000001 # default case
     
     def sample(self, state, action, next_state):
         return self._reward_func(state, action, next_state)
@@ -346,6 +381,7 @@ class RRSPProblem(pomdp_py.POMDP):
         problem.update_observation_model(new_obs_state)
 
 def test_planner(rrsp_problem, planner, debug_tree = False):
+    
     action = planner.plan(rrsp_problem.agent)
     if debug_tree:
         from pomdp_py.utils import TreeDebugger
@@ -355,14 +391,24 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
     true_state = rrsp_problem.env.state
 
     print("True State:", rrsp_problem.env.state) # Current True State
+    # print("Belief:", str(rrsp_problem.agent.cur_belief)) # Current Belief
     print("Action:", action.name)
 
-    reward = max([rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state) for next_state in rrsp_problem.agent.transition_model.get_all_states()])
-    print("Potential Reward:", reward)
+    # reward = max([rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state) for next_state in rrsp_problem.agent.transition_model.get_all_states()])
 
     # Calculate the true state change
     real_observation = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
     actionInd = standard.index(action.name[5])
+
+    try: 
+        next_state
+        print("Here")
+        reward = rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state)
+    except: 
+        reward = rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, real_observation)
+        print("There")
+        
+    print("Reward:", reward)
 
     print(action.name[5])
     print(real_observation.name[0])
@@ -407,8 +453,8 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
     # --- ---------- --- #
 
     # Reward based on how well it actually did
-    true_reward = rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state)
-    print("True Reward:", true_reward)
+    # true_reward = rrsp_problem.env.state_transition(action, execute=True)
+    # print("True Reward:", true_reward)
 
     global ss
     ss = next_state
@@ -466,17 +512,17 @@ def main():
                            show_progress=True)
     test_planner(rrspproblem, pouct)
     test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    #TreeDebugger(rrspproblem.agent.tree).pp
+    # test_planner(rrspproblem, pouct)
+    # test_planner(rrspproblem, pouct)
+    # test_planner(rrspproblem, pouct)
+    # test_planner(rrspproblem, pouct)
+    # test_planner(rrspproblem, pouct)
+    # test_planner(rrspproblem, pouct)
+    # test_planner(rrspproblem, pouct)
+    # test_planner(rrspproblem, pouct)
+    # test_planner(rrspproblem, pouct)
+    # test_planner(rrspproblem, pouct)
+    TreeDebugger(rrspproblem.agent.tree).pp
 
 if __name__ == '__main__':
     main()
