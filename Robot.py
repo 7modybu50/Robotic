@@ -1,9 +1,5 @@
-from pickle import NONE
-import re
-from turtle import delay
 import pomdp_py
 from pomdp_py import *
-from itertools import product
 import random
 
 class RRSPState(pomdp_py.State):
@@ -18,7 +14,8 @@ class RRSPState(pomdp_py.State):
     def __str__(self):
         return "\nMy points:\nrocks: " + str(self.myPoints[0]) + ", papers: " + str(
             self.myPoints[1]) + ", scissors: " + str(self.myPoints[2]) + "\n\nOpponent's points:\nrocks: " + str(
-            self.oPoints[0]) + ", papers: " + str(self.oPoints[1]) + ", scissors: " + str(self.oPoints[2]) + "\n"
+            self.oPoints[0]) + ", papers: " + str(self.oPoints[1]) + ", scissors: " + str(self.oPoints[2]) + "\n" + str(self.cards)
+
     def __repr__(self):
         return self.__str__()
     def __hash__(self):
@@ -143,6 +140,10 @@ standard = ['r','p','s'] #Put somewhere
 class TransitionModel(pomdp_py.TransitionModel):
     def probability(self, start_state, end_state, action):
 
+        if action.name[5:] not in start_state.cards:
+            print("yup")
+            return 0
+
         base = 1/3 #at start prime_prob MUST be roughly == this
 
         #Can the opponent make it end_state?
@@ -173,7 +174,7 @@ class TransitionModel(pomdp_py.TransitionModel):
         opp_win_closeness = max((start_state.oPoints[opp_action] / 3), spread_win_closeness)
 
         #(2)
-        #Get highest point win type
+        #Get the highest point win type
         highest = max(start_state.myPoints)
         highest_types = []
         for i in range(3):
@@ -199,11 +200,11 @@ class TransitionModel(pomdp_py.TransitionModel):
         #P(plays x | card_in_hand) = P(card_in_hand | plays x) * P(plays x) / P(card_in_hand)
 
         if standard[opp_action] == 'r':
-            prime_prob = defense_effect * play_x_prob/ (10 - start_state.oRock / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
+            prime_prob = play_x_prob/ (10 - start_state.oRock / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
         if standard[opp_action] == 'p':
-            prime_prob = defense_effect * play_x_prob/ (10 - start_state.oPaper / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
+            prime_prob = play_x_prob/ (10 - start_state.oPaper / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
         else:
-            prime_prob = defense_effect * play_x_prob/ (10 - start_state.oScissor / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor)))
+            prime_prob = play_x_prob/ (10 - start_state.oScissor / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor)))
 
         return prime_prob
 
@@ -217,19 +218,31 @@ class TransitionModel(pomdp_py.TransitionModel):
         return random.choices(self.get_all_states(), probabilities)[0]
     def get_all_states(self):
 
-        states = [ss]         # all draws
+        state = ss
+        states = [ss]
 
-        states.append(RRSPState([ss.myPoints[0] + 1, ss.myPoints[1], ss.myPoints[2]], ss.oPoints, ss.cards, ss.oRock, ss.oPaper, ss.oScissor))    #all wins
-        states.append(RRSPState([ss.myPoints[0], ss.myPoints[1] + 1, ss.myPoints[2]], ss.oPoints, ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
-        states.append(RRSPState([ss.myPoints[0], ss.myPoints[1], ss.myPoints[2] + 1], ss.oPoints, ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
-        states.append(RRSPState(ss.myPoints, [ss.oPoints[0] + 1, ss.oPoints[1], ss.oPoints[2]], ss.cards, ss.oRock, ss.oPaper, ss.oScissor))       #all losses
-        states.append(RRSPState(ss.myPoints, [ss.oPoints[0], ss.oPoints[1] + 1, ss.oPoints[2]], ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
-        states.append(RRSPState(ss.myPoints, [ss.oPoints[0], ss.oPoints[1], ss.oPoints[2] + 1], ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
+        #print("gas:")
+        #print(state.cards)
+
+        if "rock" in state.cards:
+            states.append(RRSPState([ss.myPoints[0] + 1, ss.myPoints[1], ss.myPoints[2]], ss.oPoints, ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
+            states.append(RRSPState(ss.myPoints, [ss.oPoints[0], ss.oPoints[1] + 1, ss.oPoints[2]], ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
+        if "paper" in state.cards:
+            states.append(RRSPState([ss.myPoints[0], ss.myPoints[1] + 1, ss.myPoints[2]], ss.oPoints, ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
+            states.append(RRSPState(ss.myPoints, [ss.oPoints[0], ss.oPoints[1], ss.oPoints[2] + 1], ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
+        if "scissor" in state.cards:
+             states.append(RRSPState([ss.myPoints[0], ss.myPoints[1], ss.myPoints[2] + 1], ss.oPoints, ss.cards, ss.oRock, ss.oPaper, ss.oScissor))
+             states.append(RRSPState(ss.myPoints, [ss.oPoints[0] + 1, ss.oPoints[1], ss.oPoints[2]], ss.cards, ss.oRock, ss.oPaper, ss.oScissor))       #all losses
+
+
 
         return states
 
 class RewardModel(pomdp_py.RewardModel):
     def _reward_func(self, state, action, next_state):
+
+        if action.name[5:] not in state.cards:
+            return -9999999
 
         if isinstance(next_state, RRSPObservation):
             if next_state.name == "rock":
@@ -342,6 +355,20 @@ class PolicyModel(pomdp_py.RolloutPolicy): #TODO: just a placeholder for now
     ACTIONS = [RRSPAction("play_rock"), RRSPAction("play_paper"), RRSPAction("play_scissor")]
 
     def sample(self, state):
+        return random.sample(self.get_feasible_actions(state), 1)[0]
+
+    def rollout(self, state, history=None):
+        """Treating this PolicyModel as a rollout policy"""
+        return self.sample(state)
+
+    def probability(self, action, state):
+        uniqueCards = len(set(state.cards))
+        if action.name[5] in state.cards:
+            return 1/uniqueCards
+        else:
+            return 0
+
+    def get_feasible_actions(self, state):
         actions = []
         if "rock" in state.cards:
             actions.append(self.ACTIONS[0])
@@ -349,15 +376,12 @@ class PolicyModel(pomdp_py.RolloutPolicy): #TODO: just a placeholder for now
             actions.append(self.ACTIONS[1])
         if "scissor" in state.cards:
             actions.append(self.ACTIONS[2])
+        return actions
 
-        return random.sample(actions, 1)[0]
+    def get_all_actions(self, state, history=None):
+        return self.get_feasible_actions(state)
 
-    def rollout(self, state, history=None):
-        """Treating this PolicyModel as a rollout policy"""
-        return self.sample(state)
 
-    def get_all_actions(self, state=None, history=None):
-        return PolicyModel.ACTIONS
 
 class RRSPProblem(pomdp_py.POMDP):
 
@@ -373,12 +397,7 @@ class RRSPProblem(pomdp_py.POMDP):
         env = pomdp_py.Environment(init_true_state, TransitionModel(), RewardModel())
         
         super().__init__(agent, env, name = "RRSPPRroblem")
-    
-    def update_observation_model(self, new_obs_state,obs_state, init_true_state, init_belief):
-        self.agent.observation_model = ObservationModel(new_obs_state)
-        problem = RRSPProblem(obs_state, init_true_state, init_belief)
-        # After the agent observes a new state
-        problem.update_observation_model(new_obs_state)
+
 
 def test_planner(rrsp_problem, planner, debug_tree = False):
     
@@ -391,24 +410,17 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
     true_state = rrsp_problem.env.state
 
     print("True State:", rrsp_problem.env.state) # Current True State
-    # print("Belief:", str(rrsp_problem.agent.cur_belief)) # Current Belief
+    #print("Belief:", str(rrsp_problem.agent.cur_belief)) # Current Belief
     print("Action:", action.name)
 
     # reward = max([rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state) for next_state in rrsp_problem.agent.transition_model.get_all_states()])
 
     # Calculate the true state change
-    real_observation = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
+    real_observation = RRSPObservation("rock","rock")
     actionInd = standard.index(action.name[5])
 
-    try: 
-        next_state
-        print("Here")
-        reward = rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state)
-    except: 
-        reward = rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, real_observation)
-        print("There")
-        
-    print("Reward:", reward)
+
+   # print("Reward:", reward)
 
     print(action.name[5])
     print(real_observation.name[0])
@@ -434,11 +446,19 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
     else:
         next_state.oScissor += 1
 
-    newCard = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
-    next_state.cards.append(newCard.name)
-    if newCard.name[0] == 'r':
+    #newCard = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
+
+    probabilities = [(10-next_state.oRock)/(30 - (next_state.oRock + next_state.oPaper + next_state.oScissor)),
+                     (10-next_state.oPaper)/(30 - (next_state.oRock + next_state.oPaper + next_state.oScissor)),
+                     (10-next_state.oScissor)/(30 - (next_state.oRock + next_state.oPaper + next_state.oScissor))]
+
+    newCard = random.choices(["rock","paper","scissor"], probabilities)[0]
+
+
+    next_state.cards.append(newCard)
+    if newCard[0] == 'r':
         next_state.oRock += 1
-    elif newCard.name[0] == 'p':
+    elif newCard[0] == 'p':
         next_state.oPaper += 1
     else:
         next_state.oScissor += 1
@@ -471,9 +491,15 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
     saved_state = rrsp_problem.env.state
 
     #Update Belief
-    planner.update(rrsp_problem.agent, action, real_observation)
+    #planner.update(rrsp_problem.agent, action, real_observation)
+    belief = pomdp_py.update_histogram_belief(rrsp_problem.agent.cur_belief, action, real_observation, rrsp_problem.agent.observation_model, rrsp_problem.agent.transition_model)
+    rrsp_problem.agent.set_belief(pomdp_py.Particles.from_histogram(belief, num_particles=100), prior=False)
+
+    print(rrsp_problem.agent.belief)
+
+
     if isinstance(planner, pomdp_py.POUCT):
-        print("Num sims:", planner.last_num_sims)
+        #print("Num sims:", planner.last_num_sims)
         print("Plan time: %2f" % planner.last_planning_time)
 
     if isinstance(rrsp_problem.agent.cur_belief, pomdp_py.Histogram):
@@ -486,7 +512,7 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
     rrsp_problem.agent.observation_model.update_state(saved_state)
     return saved_state
             
-def initialize_state(end_state = None):
+def initialize_state():
     global ss
     ss = RRSPState([0,0,0], [0,0,0], ["rock", "rock", "paper", "paper", "scissor"], 2, 2, 1)
     return ss
@@ -496,33 +522,28 @@ def main():
     init_belief = pomdp_py.Histogram({init_true_state: 1.0}) 
     rrspproblem = RRSPProblem(init_true_state, init_belief)
 
-    # Run planner
-    # vi = pomdp_py.ValueIteration(horizon=3, discount_factor=0.95)
-    # test_planner(rrspproblem, vi)
-
-    # end_state = initialize_state()
-    
     # Reset agent belief
-    rrspproblem.agent.set_belief(init_belief, prior=True)
+    rrspproblem.agent.set_belief(pomdp_py.Particles.from_histogram(init_belief, num_particles=100), prior=False)
 
     print("\n** Testing POUCT **")
-    pouct = pomdp_py.POUCT(max_depth=3, discount_factor=0.95,
-                           num_sims=4096, exploration_const=50,
+    pouct = pomdp_py.POMCP(max_depth=5, discount_factor=0.95,
+                           num_sims=8192, exploration_const=50,
                            rollout_policy=rrspproblem.agent.policy_model,
                            show_progress=True)
+
     test_planner(rrspproblem, pouct)
     test_planner(rrspproblem, pouct)
-    # test_planner(rrspproblem, pouct)
-    # test_planner(rrspproblem, pouct)
-    # test_planner(rrspproblem, pouct)
-    # test_planner(rrspproblem, pouct)
-    # test_planner(rrspproblem, pouct)
-    # test_planner(rrspproblem, pouct)
-    # test_planner(rrspproblem, pouct)
-    # test_planner(rrspproblem, pouct)
-    # test_planner(rrspproblem, pouct)
-    # test_planner(rrspproblem, pouct)
-    TreeDebugger(rrspproblem.agent.tree).pp
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    test_planner(rrspproblem, pouct)
+    #TreeDebugger(rrspproblem.agent.tree).pp
 
 if __name__ == '__main__':
     main()
