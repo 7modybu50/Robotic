@@ -128,8 +128,6 @@ class ObservationModel(pomdp_py.ObservationModel):
 
 
 standard = ['r','p','s'] #Put somewhere
-global ss
-ss = RRSPState([0,0,0], [0,0,0], ['-','-','-','-','-'], 0,0,0)
 
 class TransitionModel(pomdp_py.TransitionModel):
     def probability(self, start_state, end_state, action):
@@ -302,55 +300,6 @@ class RewardModel(pomdp_py.RewardModel):
     def sample(self, state, action, next_state):
         return self._reward_func(state, action, next_state)
 
-# class RewardModel(pomdp_py.RewardModel):
-#     def _reward_func(self, state, action, next_state):
-    
-#         ROBOT_WIN_REWARD = 200
-#         ROBOT_LOSE_PENALTY = -500
-#         FIRST_POINT_REWARD = 100
-#         SECOND_POINT_REWARD = 200
-#         OPPONENT_FIRST_POINT_PENALTY = -200
-#         OPPONENT_SECOND_POINT_PENALTY = -300
-
-#         opponent_about_to_win = self.is_about_to_win(state.oPoints)
-#         robot_about_to_win = self.is_about_to_win(state.myPoints)
-
-#         action_to_points = {"play_rock": 0, "play_paper": 1, "play_scissors": 2}
-#         action_index = action_to_points[action.name]
-
-#         if opponent_about_to_win:
-#             if next_state.oPoints[action_index] == state.oPoints[action_index] + 1 and next_state.oPoints[action_index] == 3:
-#                 return ROBOT_LOSE_PENALTY
-#             elif next_state.oPoints[action_index] == 1 and all(point == 1 for point in state.oPoints):
-#                 return ROBOT_LOSE_PENALTY
-#             else:
-#                 return FIRST_POINT_REWARD
-#         elif robot_about_to_win:
-#             if state.myPoints[action_index] == 0 and next_state.myPoints[action_index] == 1 or next_state.myPoints[action_index] == 3:
-#                 return ROBOT_WIN_REWARD
-#             else:
-#                 return 0
-#         else:
-#             if state.myPoints[action_index] == 0 and next_state.myPoints[action_index] == 1:
-#                 return FIRST_POINT_REWARD
-#             elif state.myPoints[action_index] == 1 and next_state.myPoints[action_index] == 2:
-#                 return SECOND_POINT_REWARD
-#             elif state.oPoints[action_index] == 0 and next_state.oPoints[action_index] == 1:
-#                 return OPPONENT_FIRST_POINT_PENALTY
-#             elif state.oPoints[action_index] == 1 and next_state.oPoints[action_index] == 2:
-#                 return OPPONENT_SECOND_POINT_PENALTY
-#             else:
-#                 return 0
-            
-#     @staticmethod
-#     def is_about_to_win(points):
-#         return any(point == 2 for point in points) or all(point >= 1 for point in points)
-
-
-    # def sample(self, state, action, next_state):
-    #     return self._reward_func(state, action, next_state)
-
-
 # Policy Model
 class PolicyModel(pomdp_py.RolloutPolicy): #TODO: just a placeholder for now
     """A simple policy model with uniform prior over a
@@ -358,7 +307,15 @@ class PolicyModel(pomdp_py.RolloutPolicy): #TODO: just a placeholder for now
     ACTIONS = [RRSPAction("play_rock"), RRSPAction("play_paper"), RRSPAction("play_scissor")]
 
     def sample(self, state):
-        return random.sample(self.get_all_actions(), 1)[0]
+        actions = []
+        if "rock" in state.cards:
+            actions.append(self.ACTIONS[0])
+        if "paper" in state.cards:
+            actions.append(self.ACTIONS[1])
+        if "scissor" in state.cards:
+            actions.append(self.ACTIONS[2])
+
+        return random.sample(actions, 1)[0]
 
     def rollout(self, state, history=None):
         """Treating this PolicyModel as a rollout policy"""
@@ -397,17 +354,24 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
 
     true_state = rrsp_problem.env.state
 
-    print("True State:", rrsp_problem.env.state)
+    print("True State:", rrsp_problem.env.state) # Current True State
     print("Action:", action.name)
 
+    reward = max([rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state) for next_state in rrsp_problem.agent.transition_model.get_all_states()])
+    print("Potential Reward:", reward)
+
+    # Calculate the true state change
     real_observation = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
+    actionInd = standard.index(action.name[5])
+
     print(action.name[5])
     print(real_observation.name[0])
-    if ((standard.index(action.name[5])+2) % 3) == (standard.index(real_observation.name[0])):
+
+    if ((actionInd+2) % 3) == (standard.index(real_observation.name[0])):
         next_state = true_state
         next_state.myPoints[standard.index(action.name[5])] += 1
         print("I won")
-    elif ((standard.index(action.name[5])+1) % 3) == (standard.index(real_observation.name[0])):
+    elif ((actionInd+1) % 3) == (standard.index(real_observation.name[0])):
         next_state = true_state
         next_state.oPoints[standard.index(real_observation.name[0])] += 1
         print("I lost")
@@ -415,8 +379,39 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
         next_state = true_state
         print("draw")
 
-    reward = rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state)
-    print("Reward:", reward)
+    # --- Card Replacement --- #
+    next_state.cards.remove(action.name[5:])
+    if actionInd == 0:
+        next_state.oRock += 1
+    elif actionInd == 1:
+        next_state.oPaper += 1
+    else:
+        next_state.oScissor += 1
+
+    newCard = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
+    next_state.cards.append(newCard.name)
+    if newCard.name[0] == 'r':
+        next_state.oRock += 1
+    elif newCard.name[0] == 'p':
+        next_state.oPaper += 1
+    else:
+        next_state.oScissor += 1
+
+    if real_observation.name[0] == 'r':
+        next_state.oRock += 1
+    elif real_observation.name[0] == 'p':
+        next_state.oPaper += 1
+    else:
+        next_state.oScissor += 1
+
+    # --- ---------- --- #
+
+    # Reward based on how well it actually did
+    true_reward = rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state)
+    print("True Reward:", true_reward)
+
+    global ss
+    ss = next_state
 
     rrsp_problem.env.apply_transition(next_state)
     print("New State:", rrsp_problem.env.state)
@@ -446,15 +441,9 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
     return saved_state
             
 def initialize_state(end_state = None):
-    if end_state is None:
-        total_cards = 3
-        rocks_count = 2 #random.randint(0, total_cards)
-        papers_count = 2#random.randint(0, total_cards - rocks_count)
-        scissors_count = 1#total_cards - rocks_count - papers_count
-        return RRSPState([0,0,0], [0,0,0], [rocks_count, papers_count, scissors_count], rocks_count, papers_count, scissors_count)
-    else:
-        # Use end state to initialize the new state
-        return RRSPState(end_state.myPoints, end_state.oPoints, end_state.cards, end_state.oRock, end_state.oPaper, end_state.oScissor)
+    global ss
+    ss = RRSPState([0,0,0], [0,0,0], ["rock", "rock", "paper", "paper", "scissor"], 2, 2, 1)
+    return ss
 
 def main():
     init_true_state = initialize_state() 
@@ -488,11 +477,6 @@ def main():
     test_planner(rrspproblem, pouct)
     test_planner(rrspproblem, pouct)
     #TreeDebugger(rrspproblem.agent.tree).pp
-
-    # Reinitialize state with end state
-    init_true_state = initialize_state()
-    init_belief = pomdp_py.Histogram({init_true_state: 1.0})
-    rrspproblem = RRSPProblem(init_true_state, init_belief)
 
 if __name__ == '__main__':
     main()
