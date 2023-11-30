@@ -1,4 +1,6 @@
-import pomdp_py
+import threading
+import time
+import socket
 from pomdp_py import *
 import random
 
@@ -141,8 +143,7 @@ class TransitionModel(pomdp_py.TransitionModel):
     def probability(self, start_state, end_state, action):
 
         if action.name[5:] not in start_state.cards:
-            print("yup")
-            return 0
+            return -1
 
         base = 1/3 #at start prime_prob MUST be roughly == this
 
@@ -201,7 +202,7 @@ class TransitionModel(pomdp_py.TransitionModel):
 
         if standard[opp_action] == 'r':
             prime_prob = play_x_prob/ (10 - start_state.oRock / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
-        if standard[opp_action] == 'p':
+        elif standard[opp_action] == 'p':
             prime_prob = play_x_prob/ (10 - start_state.oPaper / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor))) #(3)
         else:
             prime_prob = play_x_prob/ (10 - start_state.oScissor / (30 - (start_state.oRock + start_state.oPaper + start_state.oScissor)))
@@ -209,7 +210,7 @@ class TransitionModel(pomdp_py.TransitionModel):
         return prime_prob
 
     def sample(self, state, action):
-        probabilities = [self.probability(ss,state,action) for state in self.get_all_states()]
+        probabilities = [self.probability(state, end_state, action) for end_state in self.get_all_states()]
         remaining = 1 - sum(probabilities)
 
         for i in range(len(probabilities)-1):
@@ -399,9 +400,10 @@ class RRSPProblem(pomdp_py.POMDP):
         super().__init__(agent, env, name = "RRSPPRroblem")
 
 
-def test_planner(rrsp_problem, planner, debug_tree = False):
+def test_planner(rrsp_problem, planner, skt, debug_tree=False):
     
     action = planner.plan(rrsp_problem.agent)
+
     if debug_tree:
         from pomdp_py.utils import TreeDebugger
         dd = TreeDebugger(rrsp_problem.agent.tree)
@@ -409,72 +411,73 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
 
     true_state = rrsp_problem.env.state
 
-    print("True State:", rrsp_problem.env.state) # Current True State
+    print("True State:", true_state) # Current True State
     #print("Belief:", str(rrsp_problem.agent.cur_belief)) # Current Belief
     print("Action:", action.name)
 
-    # reward = max([rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state) for next_state in rrsp_problem.agent.transition_model.get_all_states()])
+    reward = max([rrsp_problem.env.reward_model.sample(rrsp_problem.env.state, action, next_state) for next_state in rrsp_problem.agent.transition_model.get_all_states()])
+    print("Max Reward:", reward)
 
-    # Calculate the true state change
-    real_observation = RRSPObservation("rock","rock")
-    actionInd = standard.index(action.name[5])
+    #Action sent to server
 
+    action_msg = action.name[5].encode('utf-8')
+    skt.sendall(action_msg)
 
-   # print("Reward:", reward)
+    #Recieve outcome from server
+    msg = skt.recv(1).decode('utf-8')
 
-    print(action.name[5])
-    print(real_observation.name[0])
-
-    if ((actionInd+2) % 3) == (standard.index(real_observation.name[0])):
-        next_state = true_state
+    # Infer opponent action during round
+    myAction = standard.index(action.name[5])
+    next_state = true_state
+    if msg == 'w':
+        oAction = standard[(myAction+2)%3]
         next_state.myPoints[standard.index(action.name[5])] += 1
         print("I won")
-    elif ((actionInd+1) % 3) == (standard.index(real_observation.name[0])):
-        next_state = true_state
-        next_state.oPoints[standard.index(real_observation.name[0])] += 1
+
+    elif msg == 'l':
+        oAction = standard[(myAction+1)%3]
+        next_state.oPoints[standard.index(oAction)] += 1
         print("I lost")
-    else:
-        next_state = true_state
+
+    elif msg == 'd':
+        oAction = standard[myAction]
         print("draw")
 
-    # --- Card Replacement --- #
+    elif msg == 'W':
+        return True
+    elif msg == 'L':
+        return True
+    else:
+        raise Exception("Server returned bad message")
+
     next_state.cards.remove(action.name[5:])
-    if actionInd == 0:
+
+    # Observe what the opponent played
+    if oAction == 'r':
+        oAction = "rock"
         next_state.oRock += 1
-    elif actionInd == 1:
+    elif oAction == 'p':
+        oAction = "paper"
         next_state.oPaper += 1
     else:
+        oAction = "scissor"
         next_state.oScissor += 1
 
-    #newCard = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
+    newCard = skt.recv(1).decode('utf-8')
 
-    probabilities = [(10-next_state.oRock)/(30 - (next_state.oRock + next_state.oPaper + next_state.oScissor)),
-                     (10-next_state.oPaper)/(30 - (next_state.oRock + next_state.oPaper + next_state.oScissor)),
-                     (10-next_state.oScissor)/(30 - (next_state.oRock + next_state.oPaper + next_state.oScissor))]
-
-    newCard = random.choices(["rock","paper","scissor"], probabilities)[0]
-
-
-    next_state.cards.append(newCard)
-    if newCard[0] == 'r':
+    if newCard == 'r':
+        newCard = "rock"
         next_state.oRock += 1
     elif newCard[0] == 'p':
+        newCard = "paper"
         next_state.oPaper += 1
     else:
+        newCard = "scissor"
         next_state.oScissor += 1
 
-    if real_observation.name[0] == 'r':
-        next_state.oRock += 1
-    elif real_observation.name[0] == 'p':
-        next_state.oPaper += 1
-    else:
-        next_state.oScissor += 1
+    next_state.cards.append(newCard)
 
     # --- ---------- --- #
-
-    # Reward based on how well it actually did
-    # true_reward = rrsp_problem.env.state_transition(action, execute=True)
-    # print("True Reward:", true_reward)
 
     global ss
     ss = next_state
@@ -482,8 +485,7 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
     rrsp_problem.env.apply_transition(next_state)
     print("New State:", rrsp_problem.env.state)
 
-    #real_observation = rrsp_problem.env.observation_model.sample(rrsp_problem.env.state, action)
-    #real_observation = random.choice(rrsp_problem.agent.observation_model.get_all_observations())
+    real_observation = RRSPObservation(oAction, newCard)
     print("Observation:", real_observation.name)
     rrsp_problem.agent.update_history(action, real_observation)
 
@@ -495,11 +497,8 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
     belief = pomdp_py.update_histogram_belief(rrsp_problem.agent.cur_belief, action, real_observation, rrsp_problem.agent.observation_model, rrsp_problem.agent.transition_model)
     rrsp_problem.agent.set_belief(pomdp_py.Particles.from_histogram(belief, num_particles=100), prior=False)
 
-    print(rrsp_problem.agent.belief)
-
-
     if isinstance(planner, pomdp_py.POUCT):
-        #print("Num sims:", planner.last_num_sims)
+        print("Num sims:", planner.last_num_sims)
         print("Plan time: %2f" % planner.last_planning_time)
 
     if isinstance(rrsp_problem.agent.cur_belief, pomdp_py.Histogram):
@@ -510,40 +509,76 @@ def test_planner(rrsp_problem, planner, debug_tree = False):
         )
         rrsp_problem.agent.set_belief(new_belief)
     rrsp_problem.agent.observation_model.update_state(saved_state)
-    return saved_state
-            
-def initialize_state():
-    global ss
-    ss = RRSPState([0,0,0], [0,0,0], ["rock", "rock", "paper", "paper", "scissor"], 2, 2, 1)
-    return ss
+
+    return False
+
+def connectToServer(skt):
+    for i in range(6):                                      # Equivalent to trying for 1min
+        try:
+            skt.connect(("127.0.0.1", 65432))
+            return 1
+        except:
+            print("Waiting to Connect...")
+            time.sleep(10)
+    print("Connection Failed")
+    return 0
 
 def main():
-    init_true_state = initialize_state() 
-    init_belief = pomdp_py.Histogram({init_true_state: 1.0}) 
-    rrspproblem = RRSPProblem(init_true_state, init_belief)
+    # -- Connect To Server -- #
 
-    # Reset agent belief
-    rrspproblem.agent.set_belief(pomdp_py.Particles.from_histogram(init_belief, num_particles=100), prior=False)
+    skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    print("\n** Testing POUCT **")
-    pouct = pomdp_py.POMCP(max_depth=5, discount_factor=0.95,
-                           num_sims=8192, exploration_const=50,
-                           rollout_policy=rrspproblem.agent.policy_model,
-                           show_progress=True)
+    if connectToServer(skt):
 
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    test_planner(rrspproblem, pouct)
-    #TreeDebugger(rrspproblem.agent.tree).pp
+        print("Waiting for Player 2...")  # Waits to recieve ready (or any 5 bytes lol)
+        skt.recv(5)
+        print("Player 2 connected")
+
+        cardmsg = skt.recv(10).decode('utf-8').split('|')  # Probably could see abt reducing from 1024 ??? CALL_POINT_1
+
+        cards = []
+        oRock = 0
+        oPaper = 0
+        oScissor = 0
+
+        for i in range(len(cardmsg)):  # Sets the cards in the GUI slots
+            print("yup")
+            if cardmsg[i] == 'r':
+                cards.append("rock")
+                oRock += 1
+            elif cardmsg[i] == 'p':
+                cards.append("paper")
+                oPaper += 1
+            elif cardmsg[i] == 's':
+                cards.append("scissor")
+                oScissor += 1
+            else:
+                cards.append("None")
+
+        init_true_state = RRSPState([0, 0, 0], [0, 0, 0], cards, oRock, oPaper, oScissor)
+
+        global ss
+        ss = init_true_state
+
+        init_belief = pomdp_py.Histogram({init_true_state: 1.0})
+        rrspproblem = RRSPProblem(init_true_state, init_belief)
+
+        # Reset agent belief
+        rrspproblem.agent.set_belief(pomdp_py.Particles.from_histogram(init_belief, num_particles=100), prior=False)
+
+        print("\n** Testing POMCP **")
+        pomcp = pomdp_py.POMCP(max_depth=5, discount_factor=0.95,
+                               num_sims=4096, exploration_const=50,
+                               rollout_policy=rrspproblem.agent.policy_model,
+                               show_progress=True)
+
+        won = False
+        while not won:
+            won = test_planner(rrspproblem, pomcp, skt)
+
+        # TreeDebugger(rrspproblem.agent.tree).pp
+
+    skt.close()
 
 if __name__ == '__main__':
     main()

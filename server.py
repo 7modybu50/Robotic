@@ -73,7 +73,7 @@ def main(con, addr):
             pointslot = 0
 
 
-        if winner == "draw":          # Sends draw signal
+        if winner == "draw":          # Sends drawn signal
             con.sendall(ROUND_DRAW)
         elif choice == winner:      # Updates winner
             con.sendall(ROUND_WIN)
@@ -87,6 +87,11 @@ def main(con, addr):
             won = True
             lock.release()
 
+        player.bin(choice)
+        player.draw(1)
+        new_card = player.cards[-1]
+        card_msg = new_card.encode('utf-8')
+        con.sendall(card_msg)
 
         checkpoint.wait()
         
