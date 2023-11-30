@@ -236,21 +236,21 @@ class RewardModel(pomdp_py.RewardModel):
                 if action.name == "play_rock":
                     return 0
                 elif action.name == "play_paper":
-                    return 100
+                    return 10
                 elif action.name == "play_scissor":
-                    return 200
+                    return -20
             elif next_state.name == "paper":
                 if action.name == "play_rock":
-                    return -200
+                    return -20
                 elif action.name == "play_paper":
                     return 0
                 elif action.name == "play_scissor":
-                    return 100
+                    return 10
             elif next_state.name == "scissor":
                 if action.name == "play_rock":
-                    return 100
+                    return 10
                 elif action.name == "play_paper":
-                    return -200
+                    return -20
                 elif action.name == "play_scissor":
                     return 0
             
