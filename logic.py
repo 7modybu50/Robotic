@@ -1,12 +1,9 @@
+import random
 from random import randint
 
 TOTAL_CARDS = 5
 WIN_SIZE_X = 900
 WIN_SIZE_Y = 600
-
-rocks = 10
-papers = 10
-scissors = 10
 
 class player:
 
@@ -18,6 +15,26 @@ class player:
     def draw(self, numOfCards):
         for i in range(numOfCards):
             self.cards.append(drawCard())
+
+    def draw2(self, num, remaining):
+        cards = []
+
+        for i in range(num):
+            total = sum(remaining)
+            if total <= 0:
+                return [], [0,0,0]
+            prob = [x/total for x in remaining]
+            card = random.choices(['r', 'p', 's'], prob)[0]
+            self.cards.append(card)
+
+            if card == 'r':
+                remaining[0] -= 1
+            elif card == 'p':
+                remaining[1] -= 1
+            else:
+                remaining[2] -= 1
+
+        return cards, remaining
 
     def bin(self, card):
         self.cards.remove(card)
@@ -36,6 +53,10 @@ class player:
         else:
             return False
 
+
+rocks = 10
+papers = 10
+scissors = 10
 
 def drawCard():
     global rocks, papers, scissors

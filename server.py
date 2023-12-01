@@ -21,6 +21,8 @@ connectedUsers = 0
 threads = []
 choices = []
 
+remaining = [10,10,10]
+
 checkpoint = threading.Barrier(2)
 lock = threading.Lock()
 
@@ -36,7 +38,11 @@ def main(con, addr):
 
       #---> Game Setup <---#
     player = logic.player()     # Initialise a player object for the player
-    player.draw(5)              # Draw a starting hand of cards
+
+    global remaining
+    lock.acquire()
+    card, remaining = player.draw2(5, remaining)              # Draw a starting hand of cards
+    lock.release()
 
     msg = '|'.join(player.cards)
     msg = msg.encode('utf-8')
@@ -86,7 +92,7 @@ def main(con, addr):
             lock.release()
 
         player.bin(choice)
-        player.draw(1)
+        player.draw2(1, remaining)
         new_card = player.cards[-1]
         card_msg = new_card.encode('utf-8')
         con.sendall(card_msg)

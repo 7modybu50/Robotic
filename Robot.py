@@ -117,7 +117,7 @@ class ObservationModel(pomdp_py.ObservationModel):
             return prob * (10 - self.current_state.oRock)/(30 - (self.current_state.oRock + self.current_state.oPaper + self.current_state.oScissor))
         elif observation.draw == "paper":
             return prob * (10 - self.current_state.oPaper)/(30 - (self.current_state.oRock + self.current_state.oPaper + self.current_state.oScissor))
-        elif observation.draw == "paper":
+        elif observation.draw == "scissor":
             return prob * (10 - self.current_state.oScissor)/(30 - (self.current_state.oRock + self.current_state.oPaper + self.current_state.oScissor))
         else:
             return prob
@@ -399,7 +399,7 @@ class RRSPProblem(pomdp_py.POMDP):
 
 
 def test_planner(rrsp_problem, planner, skt, debug_tree=False):
-    
+
     action = planner.plan(rrsp_problem.agent)
 
     if debug_tree:
@@ -540,7 +540,6 @@ def main():
         oScissor = 0
 
         for i in range(len(cardmsg)):  # Sets the cards in the GUI slots
-            print("yup")
             if cardmsg[i] == 'r':
                 cards.append("rock")
                 oRock += 1
@@ -565,16 +564,15 @@ def main():
         rrspproblem.agent.set_belief(pomdp_py.Particles.from_histogram(init_belief, num_particles=100), prior=False)
 
         print("\n** Testing POMCP **")
-        pomcp = pomdp_py.POMCP(max_depth=5, discount_factor=0.95,
-                               num_sims=4096, exploration_const=50,
+        pomcp = pomdp_py.POMCP(max_depth=9, discount_factor=0.4,
+                               num_sims=4096, exploration_const=100,
                                rollout_policy=rrspproblem.agent.policy_model,
                                show_progress=True)
 
         won = False
         while not won:
             won = test_planner(rrspproblem, pomcp, skt)
-
-        # TreeDebugger(rrspproblem.agent.tree).pp
+            #TreeDebugger(rrspproblem.agent.tree).pp
 
     skt.close()
 
