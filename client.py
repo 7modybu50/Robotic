@@ -14,6 +14,7 @@ WIN_SIZE_Y = 700
 window = tk.Tk()
 
 cardslots = []
+points_box = []
 lastbutton = 0
 
 def screenGen(window, skt):
@@ -37,6 +38,24 @@ def screenGen(window, skt):
     for i in range(TOTAL_CARDS):
         cardslots.append(tk.Button(handspace, text="", command=lambda local = i: sendChoice(local, skt)))
         cardslots[i].pack(side=LEFT, fill="both", expand=True)
+
+    playertitle = tk.Label(topBar, text="YOU")
+    p_points = tk.Label(scorespace, text="0-0-0")
+    opptitle = tk.Label(topBar, text="THEM")
+    o_points = tk.Label(scorespace, text="0-0-0")
+
+    global points_box
+    points_box = [p_points, o_points]
+
+    playertitle.pack(side=LEFT, fill="both", expand=True)
+    p_points.pack(side=LEFT, fill="both", expand=True)
+    opptitle.pack(side=LEFT, fill="both", expand=True)
+    o_points.pack(side=LEFT, fill="both", expand=True)
+
+    playertitle.config(font=("Helvetica", 80))
+    p_points.config(font=("Helvetica", 100))
+    opptitle.config(font=("Helvetica", 80))
+    o_points.config(font=("Helvetica", 100))
 
     return cardslots
 
@@ -74,15 +93,23 @@ def connectToServer(skt):
 
 def gameProcessor():
     global won
+    global lastbutton
     won = False
+    standard = ['r','p','s']
     while not won:
         msg = skt.recv(1).decode('utf-8')
+
+        # Get points
+        p_scrn_points = points_box[0].cget("text").split('-')
+        o_scrn_points = points_box[1].cget("text").split('-')
         
         if msg == 'w':
             print("Battle Won")
+            p_scrn_points[standard.index(cards[lastbutton])] = int(p_scrn_points[standard.index(cards[lastbutton])]) + 1       # Update Points
             toggleButtons()
         elif msg == 'l':
             print("Battle Lost")
+            o_scrn_points[(standard.index(cards[lastbutton])+1)%3] = int(o_scrn_points[(standard.index(cards[lastbutton])+1)%3]) + 1 # Update Points
             toggleButtons()
         elif msg == 'd':
             print("Draw")
@@ -98,7 +125,11 @@ def gameProcessor():
             time.sleep(10)
             window.destroy()
 
-        global lastbutton
+        # Show Points
+        points_box[0].configure(text='-'.join([str(item) for item in p_scrn_points]))
+        points_box[1].configure(text='-'.join([str(item) for item in o_scrn_points]))
+
+        # Update card selections
         newCard = skt.recv(1).decode('utf-8')
         print(newCard)
         if newCard == 'r':

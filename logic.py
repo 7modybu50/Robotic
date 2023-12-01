@@ -31,6 +31,7 @@ class player:
             self.won = True
             return True
         elif self.points[0] >= 1 and self.points[1] >= 1 and self.points[2] >= 1:
+            self.won = True
             return True
         else:
             return False

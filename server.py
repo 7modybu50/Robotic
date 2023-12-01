@@ -72,7 +72,6 @@ def main(con, addr):
             winner = 'r'
             pointslot = 0
 
-
         if winner == "draw":          # Sends drawn signal
             con.sendall(ROUND_DRAW)
         elif choice == winner:      # Updates winner
@@ -80,7 +79,6 @@ def main(con, addr):
             player.points[pointslot] += 1
         else:                       # Updates loser
             con.sendall(ROUND_LOSE)
-        
 
         if player.hasWon():         # Checks if player has won
             lock.acquire()
@@ -119,7 +117,6 @@ skt.bind((HOST, PORT))
 skt.listen(2)
 
 while connectedUsers < 2:
-    #try:
         con, addr = skt.accept()
         thread = threading.Thread(target=main, args=(con, addr))
         thread.start()
@@ -127,10 +124,6 @@ while connectedUsers < 2:
     
         connectedUsers += 1
         print("player connected successfully")
-
-   # except:
-        #print("Connection Failed...")
-
 
 ready = True
 
